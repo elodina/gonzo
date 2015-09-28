@@ -7,10 +7,6 @@ go:
 - 1.5.1
 - tip
 
-before_install: 
-- go get -u github.com/golang/lint/golint
-
 script:
 - go vet
-- golint
 - go test -v

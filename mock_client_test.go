@@ -29,11 +29,11 @@ func TestMockClientGoodFetch(t *testing.T) {
 	}
 
 	if len(response.Data) != 1 {
-		t.Fatalf("response.Data length should be 1, actual %s", len(response.Data))
+		t.Fatalf("response.Data length should be 1, actual %d", len(response.Data))
 	}
 
 	if len(response.Data["test"]) != 1 {
-		t.Fatalf(`response.Data["test"] length should be 1, actual %s`, len(response.Data["test"]))
+		t.Fatalf(`response.Data["test"] length should be 1, actual %d`, len(response.Data["test"]))
 	}
 
 	if response.Data["test"][0].Error != siesta.ErrNoError {
@@ -68,11 +68,11 @@ func TestMockClientBadFetch(t *testing.T) {
 	}
 
 	if len(response.Data) != 1 {
-		t.Fatalf("response.Data length should be 1, actual %s", len(response.Data))
+		t.Fatalf("response.Data length should be 1, actual %d", len(response.Data))
 	}
 
 	if len(response.Data["test"]) != 1 {
-		t.Fatalf(`response.Data["test"] length should be 1, actual %s`, len(response.Data["test"]))
+		t.Fatalf(`response.Data["test"] length should be 1, actual %d`, len(response.Data["test"]))
 	}
 
 	if response.Data["test"][0].Error != siesta.ErrBrokerNotAvailable {
