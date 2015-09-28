@@ -15,7 +15,10 @@ limitations under the License. */
 
 package gonzo
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestConsumerAssignments(t *testing.T) {
 	client := NewMockClient(0, 0)
@@ -68,4 +71,109 @@ func TestConsumerAssignments(t *testing.T) {
 	consumer.Remove("test1", 1)
 	assignments = consumer.Assignment()
 	assertFatal(t, len(assignments), 0)
+}
+
+func TestConsumerOffset(t *testing.T) {
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+
+	// offset for non-existing
+	offset, err := consumer.Offset("asd", 0)
+	assert(t, offset, int64(-1))
+	assertNot(t, err, nil)
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("Error message should contain 'does not exist' text")
+	}
+
+	// add partition consumer and ensure it has offset 0 and no error
+	consumer.Add("test", 0)
+	offset, err = consumer.Offset("test", 0)
+	assert(t, offset, int64(0))
+	assert(t, err, nil)
+
+	// move offset and ensure Offset returns this value
+	expectedOffset := int64(123)
+	consumer.partitionConsumers["test"][0].(*MockPartitionConsumer).offset = expectedOffset
+	offset, err = consumer.Offset("test", 0)
+	assert(t, offset, expectedOffset)
+	assert(t, err, nil)
+
+	// offset for existing topic but non-existing partition should return error
+	offset, err = consumer.Offset("test", 1)
+	assert(t, offset, int64(-1))
+	assertNot(t, err, nil)
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("Error message should contain 'does not exist' text")
+	}
+}
+
+func TestConsumerCommitOffset(t *testing.T) {
+	client := NewMockClient(0, 0)
+	config := NewConsumerConfig()
+	consumer := NewConsumer(client, config, NoOpStrategy)
+	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+
+	err := consumer.Commit("asd", 0, 123)
+	assert(t, err, nil)
+	assert(t, client.commitCount[config.Group]["asd"][0], 1) //expect one commit
+	assert(t, client.offsets[config.Group]["asd"][0], int64(123))
+}
+
+func TestConsumerSetOffset(t *testing.T) {
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+
+	// set for non-existing
+	err := consumer.SetOffset("asd", 0, 123)
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("Error message should contain 'does not exist' text")
+	}
+
+	topic := "test"
+	partition := int32(0)
+	offset := int64(-1)
+	seekOffset := int64(123)
+
+	// add a topic-partition and make sure SetOffset overrides offset
+	consumer.Add(topic, partition)
+	offset, err = consumer.Offset(topic, partition)
+	assert(t, offset, int64(0))
+	assert(t, err, nil)
+
+	err = consumer.SetOffset(topic, partition, seekOffset)
+	assert(t, err, nil)
+
+	offset, err = consumer.Offset(topic, partition)
+	assert(t, offset, seekOffset)
+	assert(t, err, nil)
+}
+
+func TestConsumerLag(t *testing.T) {
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+
+	// lag for non-existing
+	lag, err := consumer.Lag("asd", 0)
+	assert(t, lag, int64(-1))
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("Error message should contain 'does not exist' text")
+	}
+
+	topic := "test"
+	partition := int32(0)
+
+	consumer.Add(topic, partition)
+	lag, err = consumer.Lag(topic, partition)
+	assert(t, lag, int64(0))
+	assert(t, err, nil)
+
+	// move lag value and ensure Lag returns this value
+	expectedLag := int64(123)
+	consumer.partitionConsumers[topic][partition].(*MockPartitionConsumer).lag = expectedLag
+	lag, err = consumer.Lag(topic, partition)
+	assert(t, lag, expectedLag)
+	assert(t, err, nil)
 }

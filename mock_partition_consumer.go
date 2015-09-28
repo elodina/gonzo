@@ -15,7 +15,12 @@ limitations under the License. */
 
 package gonzo
 
-type MockPartitionConsumer struct{}
+type MockPartitionConsumer struct {
+	offset int64
+	lag    int64
+
+	committedOffset int64
+}
 
 func NewMockPartitionConsumer(client Client, group string, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
 	return new(MockPartitionConsumer)
@@ -31,7 +36,7 @@ func (mpc *MockPartitionConsumer) Stop() {
 
 func (mpc *MockPartitionConsumer) Offset() int64 {
 	Logger.Info("MockPartitionConsumer.Offset()")
-	return 0
+	return mpc.offset
 }
 
 func (mpc *MockPartitionConsumer) Commit(offset int64) error {
@@ -41,9 +46,10 @@ func (mpc *MockPartitionConsumer) Commit(offset int64) error {
 
 func (mpc *MockPartitionConsumer) SetOffset(offset int64) {
 	Logger.Info("MockPartitionConsumer.SetOffset()")
+	mpc.offset = offset
 }
 
 func (mpc *MockPartitionConsumer) Lag() int64 {
 	Logger.Info("MockPartitionConsumer.Lag()")
-	return 0
+	return mpc.lag
 }

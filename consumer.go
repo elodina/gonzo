@@ -54,7 +54,7 @@ func (c *Consumer) Add(topic string, partition int32) {
 		return
 	}
 
-	c.partitionConsumers[topic][partition] = NewPartitionConsumer(c.client, c.config.Group, topic, partition, c.strategy)
+	c.partitionConsumers[topic][partition] = c.partitionConsumerFactory(c.client, c.config.Group, topic, partition, c.strategy)
 	go c.partitionConsumers[topic][partition].Start()
 }
 
@@ -101,28 +101,29 @@ func (c *Consumer) Commit(topic string, partition int32, offset int64) error {
 	return c.client.CommitOffset(c.config.Group, topic, partition, offset)
 }
 
-func (c *Consumer) SetOffset(topic string, partition int32, offset int64) {
+func (c *Consumer) SetOffset(topic string, partition int32, offset int64) error {
 	c.partitionConsumersLock.Lock()
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
 		Logger.Info("Can't set offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
-		return
+		return fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 	}
 
 	c.partitionConsumers[topic][partition].SetOffset(offset)
+	return nil
 }
 
-func (c *Consumer) Lag(topic string, partition int32) int64 {
+func (c *Consumer) Lag(topic string, partition int32) (int64, error) {
 	c.partitionConsumersLock.Lock()
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
 		Logger.Info("Can't get lag as partition consumer for topic %s, partition %d does not exist", topic, partition)
-		return -1
+		return -1, fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 	}
 
-	return c.partitionConsumers[topic][partition].Lag()
+	return c.partitionConsumers[topic][partition].Lag(), nil
 }
 
 func (c *Consumer) exists(topic string, partition int32) bool {
