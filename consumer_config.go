@@ -15,12 +15,20 @@ limitations under the License. */
 
 package gonzo
 
+import "github.com/stealthly/siesta"
+
 type ConsumerConfig struct {
-	Group string
+	Group           string
+	KeyDecoder      Decoder
+	ValueDecoder    Decoder
+	AutoOffsetReset int64
 }
 
 func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
-		Group: "gonzo-group",
+		Group:           "gonzo-group",
+		KeyDecoder:      new(ByteDecoder),
+		ValueDecoder:    new(ByteDecoder),
+		AutoOffsetReset: siesta.EarliestTime,
 	}
 }

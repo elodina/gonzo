@@ -34,15 +34,15 @@ func main() {
 	consumer.Add("gonzo", 0)
 	consumer.Add("gonzo", 1)
 
-	select {} //TODO need a better way to await completion, e.g could use something like WaitGroups or Join()
+	consumer.Join()
 }
 
-func consumerStrategy(messages []*siesta.MessageAndMetadata, err error, consumer *gonzo.PartitionConsumer) {
-	if err != nil {
-		panic(err)
+func consumerStrategy(data *gonzo.FetchData, consumer *gonzo.PartitionConsumer) {
+	if data.Error != nil {
+		panic(data.Error)
 	}
 
-	for _, msg := range messages {
+	for _, msg := range data.Messages {
 		fmt.Printf("%s from partition %d\n", string(msg.Value), msg.Partition)
 	}
 }

@@ -18,11 +18,9 @@ package gonzo
 type MockPartitionConsumer struct {
 	offset int64
 	lag    int64
-
-	committedOffset int64
 }
 
-func NewMockPartitionConsumer(client Client, group string, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
+func NewMockPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
 	return new(MockPartitionConsumer)
 }
 

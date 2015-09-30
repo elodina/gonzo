@@ -1,4 +1,4 @@
-/* Licensed to Elodina Inc. under one or more
+/* Licensed to the Apache Software Foundation (ASF) under one or more
 contributor license agreements.  See the NOTICE file distributed with
 this work for additional information regarding copyright ownership.
 The ASF licenses this file to You under the Apache License, Version 2.0
@@ -15,9 +15,19 @@ limitations under the License. */
 
 package gonzo
 
-import "github.com/stealthly/siesta"
+type FetchData struct {
+	Messages            []*MessageAndMetadata
+	HighwaterMarkOffset int64
+	Error               error
+}
 
-//TODO passing consumer around is bad, we should have an interface that does not allow to call Start()/Stop() from strategy
-type Strategy func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer)
+type MessageAndMetadata struct {
+	Key       []byte
+	Value     []byte
+	Topic     string
+	Partition int32
+	Offset    int64
 
-var NoOpStrategy = func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {}
+	DecodedKey   interface{}
+	DecodedValue interface{}
+}

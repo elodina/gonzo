@@ -13,34 +13,38 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package main
+package gonzo
 
-import (
-	"fmt"
-	"github.com/elodina/gonzo"
-	"github.com/stealthly/siesta"
-)
+import "testing"
 
-func main() {
-	config := siesta.NewConnectorConfig()
-	config.BrokerList = []string{"localhost:9092"}
+func TestDecoders(t *testing.T) {
+	// normal bytes
+	bytes := []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05}
+	byteDecoder := new(ByteDecoder)
+	decodedBytes, err := byteDecoder.Decode(bytes)
 
-	client, err := siesta.NewDefaultConnector(config)
-	if err != nil {
-		panic(err)
-	}
+	assertFatal(t, err, nil)
+	assert(t, decodedBytes, bytes)
 
-	consumer := gonzo.NewPartitionConsumer(client, gonzo.NewConsumerConfig(), "gonzo", 0, partitionConsumerStrategy)
+	// empty bytes
+	bytes = nil
+	decodedBytes, err = byteDecoder.Decode(bytes)
 
-	consumer.Start()
-}
+	assertFatal(t, err, nil)
+	assert(t, decodedBytes, bytes)
 
-func partitionConsumerStrategy(data *gonzo.FetchData, consumer *gonzo.PartitionConsumer) {
-	if data.Error != nil {
-		panic(data.Error)
-	}
+	// normal string
+	str := "hello world"
+	stringDecoder := new(StringDecoder)
+	decodedString, err := stringDecoder.Decode([]byte(str))
 
-	for _, msg := range data.Messages {
-		fmt.Printf("%s from partition %d\n", string(msg.Value), msg.Partition)
-	}
+	assertFatal(t, err, nil)
+	assert(t, decodedString, str)
+
+	// empty string
+	str = ""
+	decodedString, err = stringDecoder.Decode([]byte(str))
+
+	assertFatal(t, err, nil)
+	assert(t, decodedString, str)
 }

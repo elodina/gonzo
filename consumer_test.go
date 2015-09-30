@@ -18,7 +18,10 @@ package gonzo
 import (
 	"strings"
 	"testing"
+	"time"
 )
+
+var NoOpStrategy = func(data *FetchData, consumer *PartitionConsumer) {}
 
 func TestConsumerAssignments(t *testing.T) {
 	client := NewMockClient(0, 0)
@@ -176,4 +179,71 @@ func TestConsumerLag(t *testing.T) {
 	lag, err = consumer.Lag(topic, partition)
 	assert(t, lag, expectedLag)
 	assert(t, err, nil)
+}
+
+func TestConsumerAwaitTermination(t *testing.T) {
+	timeout := time.Second
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+
+	success := make(chan struct{})
+	go func() {
+		consumer.AwaitTermination()
+		success <- struct{}{}
+	}()
+
+	consumer.Add("test", 0)
+	consumer.Stop()
+	select {
+	case <-success:
+	case <-time.After(timeout):
+		t.Fatalf("Await termination failed to unblock within %s", timeout)
+	}
+}
+
+func TestConsumerJoin(t *testing.T) {
+	timeout := time.Second
+	topic := "test"
+	partition := int32(0)
+
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+
+	success := make(chan struct{})
+
+	go func() {
+		consumer.Join() //should exit immediately as no topic/partitions are being consumed
+		success <- struct{}{}
+	}()
+
+	select {
+	case <-success:
+	case <-time.After(timeout):
+		t.Fatalf("Join failed to unblock within %s", timeout)
+	}
+
+	// add one topic/partition and make sure Join does not unblock before we need it to
+	consumer.Add(topic, partition)
+
+	go func() {
+		consumer.Join()
+		success <- struct{}{}
+	}()
+
+	select {
+	case <-success:
+		t.Fatalf("Join unblocked while it shouldn't")
+	case <-time.After(timeout):
+	}
+
+	//now remove topic-partition and make sure Join now unblocks fine
+	consumer.Remove(topic, partition)
+
+	select {
+	case <-success:
+	case <-time.After(timeout):
+		t.Fatalf("Join failed to unblock within %s", timeout)
+	}
 }

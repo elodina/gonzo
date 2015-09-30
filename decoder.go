@@ -13,34 +13,20 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package main
+package gonzo
 
-import (
-	"fmt"
-	"github.com/elodina/gonzo"
-	"github.com/stealthly/siesta"
-)
-
-func main() {
-	config := siesta.NewConnectorConfig()
-	config.BrokerList = []string{"localhost:9092"}
-
-	client, err := siesta.NewDefaultConnector(config)
-	if err != nil {
-		panic(err)
-	}
-
-	consumer := gonzo.NewPartitionConsumer(client, gonzo.NewConsumerConfig(), "gonzo", 0, partitionConsumerStrategy)
-
-	consumer.Start()
+type Decoder interface {
+	Decode([]byte) (interface{}, error)
 }
 
-func partitionConsumerStrategy(data *gonzo.FetchData, consumer *gonzo.PartitionConsumer) {
-	if data.Error != nil {
-		panic(data.Error)
-	}
+type ByteDecoder struct{}
 
-	for _, msg := range data.Messages {
-		fmt.Printf("%s from partition %d\n", string(msg.Value), msg.Partition)
-	}
+func (*ByteDecoder) Decode(bytes []byte) (interface{}, error) {
+	return bytes, nil
+}
+
+type StringDecoder struct{}
+
+func (*StringDecoder) Decode(bytes []byte) (interface{}, error) {
+	return string(bytes), nil
 }

@@ -26,22 +26,22 @@ func TestPartitionConsumerSingleFetch(t *testing.T) {
 	topic := "test"
 	partition := int32(0)
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		for i, msg := range messages {
+		for i, msg := range data.Messages {
 			assert(t, string(msg.Value), fmt.Sprintf("message-%d", i))
 			assert(t, msg.Topic, topic)
 			assert(t, msg.Partition, partition)
 			assert(t, msg.Offset, int64(i))
 		}
 
-		assertFatal(t, len(messages), 100)
+		assertFatal(t, len(data.Messages), 100)
 		consumer.Stop()
 	}
 
 	client := NewMockClient(0, 100)
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -52,16 +52,16 @@ func TestPartitionConsumerMultipleFetchesFromStart(t *testing.T) {
 	expectedMessages := 512
 	actualMessages := 0
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		for _, msg := range messages {
+		for _, msg := range data.Messages {
 			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
 			assert(t, msg.Topic, topic)
 			assert(t, msg.Partition, partition)
 		}
 
-		actualMessages += len(messages)
+		actualMessages += len(data.Messages)
 
 		if actualMessages == expectedMessages {
 			consumer.Stop()
@@ -69,7 +69,7 @@ func TestPartitionConsumerMultipleFetchesFromStart(t *testing.T) {
 	}
 
 	client := NewMockClient(0, int64(expectedMessages))
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -81,16 +81,16 @@ func TestPartitionConsumerMultipleFetches(t *testing.T) {
 	expectedMessages := 512
 	actualMessages := 0
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		for _, msg := range messages {
+		for _, msg := range data.Messages {
 			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
 			assert(t, msg.Topic, topic)
 			assert(t, msg.Partition, partition)
 		}
 
-		actualMessages += len(messages)
+		actualMessages += len(data.Messages)
 
 		if actualMessages == expectedMessages {
 			consumer.Stop()
@@ -98,7 +98,7 @@ func TestPartitionConsumerMultipleFetches(t *testing.T) {
 	}
 
 	client := NewMockClient(int64(startOffset), int64(startOffset+expectedMessages))
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -109,16 +109,16 @@ func TestPartitionConsumerEmptyFetch(t *testing.T) {
 	expectedMessages := 512
 	actualMessages := 0
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		for _, msg := range messages {
+		for _, msg := range data.Messages {
 			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
 			assert(t, msg.Topic, topic)
 			assert(t, msg.Partition, partition)
 		}
 
-		actualMessages += len(messages)
+		actualMessages += len(data.Messages)
 
 		if actualMessages == expectedMessages {
 			consumer.Stop()
@@ -127,35 +127,22 @@ func TestPartitionConsumerEmptyFetch(t *testing.T) {
 
 	client := NewMockClient(0, int64(expectedMessages))
 	client.emptyFetches = 2
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
 
 func TestPartitionConsumerFetchError(t *testing.T) {
-	topic := "test"
-	partition := int32(0)
-	expectedMessages := 200
-	actualMessages := 0
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, siesta.ErrEOF)
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
-
-		for _, msg := range messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
-		}
-
-		actualMessages += len(messages)
-
-		if actualMessages == expectedMessages {
-			consumer.Stop()
-		}
+		consumer.Stop()
 	}
 
-	client := NewMockClient(0, int64(expectedMessages))
+	client := NewMockClient(0, 200)
 	client.fetchError = siesta.ErrEOF
 	client.fetchErrorTimes = 1
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), "test", 0, strategy)
 
 	consumer.Start()
 }
@@ -166,14 +153,14 @@ func TestPartitionConsumerFetchResponseError(t *testing.T) {
 	expectedMessages := 200
 	actualMessages := 0
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		for _, msg := range messages {
+		for _, msg := range data.Messages {
 			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
 		}
 
-		actualMessages += len(messages)
+		actualMessages += len(data.Messages)
 
 		if actualMessages == expectedMessages {
 			consumer.Stop()
@@ -182,7 +169,7 @@ func TestPartitionConsumerFetchResponseError(t *testing.T) {
 
 	client := NewMockClient(0, int64(expectedMessages))
 	client.fetchError = siesta.ErrUnknownTopicOrPartition
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -193,14 +180,14 @@ func TestPartitionConsumerGetOffsetErrors(t *testing.T) {
 	expectedMessages := 200
 	actualMessages := 0
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		for _, msg := range messages {
+		for _, msg := range data.Messages {
 			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
 		}
 
-		actualMessages += len(messages)
+		actualMessages += len(data.Messages)
 
 		if actualMessages == expectedMessages {
 			consumer.Stop()
@@ -212,7 +199,7 @@ func TestPartitionConsumerGetOffsetErrors(t *testing.T) {
 	client.getOffsetErrorTimes = 2
 	client.getAvailableOffsetError = siesta.ErrEOF
 	client.getAvailableOffsetErrorTimes = 2
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -222,7 +209,7 @@ func TestPartitionConsumerStopOnInitOffset(t *testing.T) {
 	partition := int32(0)
 	expectedMessages := 200
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
 		t.Fatal("Should not reach here")
 	}
 
@@ -231,7 +218,7 @@ func TestPartitionConsumerStopOnInitOffset(t *testing.T) {
 	client.getOffsetErrorTimes = 3
 	client.getAvailableOffsetError = siesta.ErrEOF
 	client.getAvailableOffsetErrorTimes = 3
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -245,7 +232,7 @@ func TestPartitionConsumerStopOnOffsetReset(t *testing.T) {
 	partition := int32(0)
 	expectedMessages := 200
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
 		t.Fatal("Should not reach here")
 	}
 
@@ -254,7 +241,7 @@ func TestPartitionConsumerStopOnOffsetReset(t *testing.T) {
 	client.getOffsetErrorTimes = 3
 	client.getAvailableOffsetError = siesta.ErrEOF
 	client.getAvailableOffsetErrorTimes = 3
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -269,16 +256,16 @@ func TestPartitionConsumerOffsetAndLag(t *testing.T) {
 	startOffset := 134
 	highwaterMarkOffset := 17236
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
-		assert(t, consumer.Offset(), int64(startOffset+len(messages)))
-		assert(t, consumer.Lag(), int64(highwaterMarkOffset-(startOffset+len(messages))))
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
+		assert(t, consumer.Offset(), int64(startOffset+len(data.Messages)))
+		assert(t, consumer.Lag(), int64(highwaterMarkOffset-(startOffset+len(data.Messages))))
 
 		consumer.Stop()
 	}
 
 	client := NewMockClient(int64(startOffset), int64(highwaterMarkOffset))
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -289,10 +276,10 @@ func TestPartitionConsumerSetOffset(t *testing.T) {
 	startOffset := 134
 	setOffsetDone := false
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		assert(t, messages[0].Offset, int64(startOffset))
+		assert(t, data.Messages[0].Offset, int64(startOffset))
 
 		if setOffsetDone {
 			consumer.Stop()
@@ -304,32 +291,32 @@ func TestPartitionConsumerSetOffset(t *testing.T) {
 	}
 
 	client := NewMockClient(int64(startOffset), int64(startOffset+100))
-	consumer := NewPartitionConsumer(client, "group", topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
 
 func TestPartitionConsumerCommit(t *testing.T) {
-	group := "group"
+	config := NewConsumerConfig()
 	topic := "test"
 	partition := int32(0)
 	startOffset := 134
 	hwOffset := int64(startOffset + 100)
 
-	strategy := func(messages []*siesta.MessageAndMetadata, err error, consumer *PartitionConsumer) {
-		assertFatal(t, err, nil)
+	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+		assertFatal(t, data.Error, nil)
 
-		consumer.Commit(messages[len(messages)-1].Offset)
+		consumer.Commit(data.Messages[len(data.Messages)-1].Offset)
 		consumer.Stop()
 	}
 
 	client := NewMockClient(int64(startOffset), hwOffset)
-	consumer := NewPartitionConsumer(client, group, topic, partition, strategy)
-	client.initOffsets(group, topic, partition)
-	assertFatal(t, client.offsets[group][topic][partition], int64(0))
+	consumer := NewPartitionConsumer(client, config, topic, partition, strategy)
+	client.initOffsets(config.Group, topic, partition)
+	assertFatal(t, client.offsets[config.Group][topic][partition], int64(0))
 
 	consumer.Start()
-	assertFatal(t, client.offsets[group][topic][partition], hwOffset-1)
+	assertFatal(t, client.offsets[config.Group][topic][partition], hwOffset-1)
 
-	assertFatal(t, client.commitCount[group][topic][partition], 1)
+	assertFatal(t, client.commitCount[config.Group][topic][partition], 1)
 }

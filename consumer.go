@@ -26,9 +26,11 @@ type Consumer struct {
 	strategy               Strategy
 	partitionConsumers     map[string]map[int32]PartitionConsumerInterface
 	partitionConsumersLock sync.Mutex
+	assignmentsWaitGroup   sync.WaitGroup
+	stopped                chan struct{}
 
 	// for testing purposes
-	partitionConsumerFactory func(client Client, group string, topic string, partition int32, strategy Strategy) PartitionConsumerInterface
+	partitionConsumerFactory func(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumerInterface
 }
 
 func NewConsumer(client Client, config *ConsumerConfig, strategy Strategy) *Consumer {
@@ -38,6 +40,7 @@ func NewConsumer(client Client, config *ConsumerConfig, strategy Strategy) *Cons
 		strategy:                 strategy,
 		partitionConsumers:       make(map[string]map[int32]PartitionConsumerInterface),
 		partitionConsumerFactory: NewPartitionConsumer,
+		stopped:                  make(chan struct{}, 1),
 	}
 }
 
@@ -54,7 +57,8 @@ func (c *Consumer) Add(topic string, partition int32) {
 		return
 	}
 
-	c.partitionConsumers[topic][partition] = c.partitionConsumerFactory(c.client, c.config.Group, topic, partition, c.strategy)
+	c.partitionConsumers[topic][partition] = c.partitionConsumerFactory(c.client, c.config, topic, partition, c.strategy)
+	c.assignmentsWaitGroup.Add(1)
 	go c.partitionConsumers[topic][partition].Start()
 }
 
@@ -68,6 +72,7 @@ func (c *Consumer) Remove(topic string, partition int32) {
 	}
 
 	c.partitionConsumers[topic][partition].Stop()
+	c.assignmentsWaitGroup.Done()
 	delete(c.partitionConsumers[topic], partition)
 }
 
@@ -124,6 +129,25 @@ func (c *Consumer) Lag(topic string, partition int32) (int64, error) {
 	}
 
 	return c.partitionConsumers[topic][partition].Lag(), nil
+}
+
+func (c *Consumer) Stop() {
+	for topic, partitions := range c.Assignment() {
+		for _, partition := range partitions {
+			c.Remove(topic, partition)
+		}
+	}
+	c.stopped <- struct{}{}
+}
+
+// AwaitTermination blocks until Stop() is called.
+func (c *Consumer) AwaitTermination() {
+	<-c.stopped
+}
+
+// Join blocks until consumer has at least one topic/partition to consume.
+func (c *Consumer) Join() {
+	c.assignmentsWaitGroup.Wait()
 }
 
 func (c *Consumer) exists(topic string, partition int32) bool {
