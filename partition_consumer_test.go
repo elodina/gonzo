@@ -22,6 +22,43 @@ import (
 	"time"
 )
 
+type MockPartitionConsumer struct {
+	offset int64
+	lag    int64
+}
+
+func NewMockPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
+	return new(MockPartitionConsumer)
+}
+
+func (mpc *MockPartitionConsumer) Start() {
+	Logger.Info("MockPartitionConsumer.Start()")
+}
+
+func (mpc *MockPartitionConsumer) Stop() {
+	Logger.Info("MockPartitionConsumer.Stop()")
+}
+
+func (mpc *MockPartitionConsumer) Offset() int64 {
+	Logger.Info("MockPartitionConsumer.Offset()")
+	return mpc.offset
+}
+
+func (mpc *MockPartitionConsumer) Commit(offset int64) error {
+	Logger.Info("MockPartitionConsumer.Commit()")
+	return nil
+}
+
+func (mpc *MockPartitionConsumer) SetOffset(offset int64) {
+	Logger.Info("MockPartitionConsumer.SetOffset()")
+	mpc.offset = offset
+}
+
+func (mpc *MockPartitionConsumer) Lag() int64 {
+	Logger.Info("MockPartitionConsumer.Lag()")
+	return mpc.lag
+}
+
 func TestPartitionConsumerSingleFetch(t *testing.T) {
 	topic := "test"
 	partition := int32(0)

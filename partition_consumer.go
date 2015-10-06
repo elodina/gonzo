@@ -21,15 +21,33 @@ import (
 	"time"
 )
 
+// PartitionConsumerInterface is an interface responsible for consuming exactly one topic/partition
+// from Kafka. Used to switch between PartitionConsumer in live mode and MockPartitionConsumer in tests.
 type PartitionConsumerInterface interface {
+	// Start starts consuming given topic/partition.
 	Start()
+
+	// Stop stops consuming given topic/partition.
 	Stop()
+
+	// Offset returns the last fetched offset for this partition consumer.
 	Offset() int64
+
+	// Commit commits the given offset to Kafka. Returns an error on unsuccessful commit.
 	Commit(offset int64) error
+
+	// SetOffset overrides the current fetch offset value for given topic/partition.
+	// This does not commit offset but allows you to move back and forth throughout the partition.
 	SetOffset(offset int64)
+
+	// Lag returns the difference between the latest available offset in the partition and the
+	// latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 	Lag() int64
 }
 
+// PartitionConsumer serves to consume exactly one topic/partition from Kafka.
+// This is very similar to JVM SimpleConsumer except the PartitionConsumer is able to handle
+// leader changes and supports committing offsets to Kafka via Siesta client.
 type PartitionConsumer struct {
 	client              Client
 	config              *ConsumerConfig
@@ -41,6 +59,9 @@ type PartitionConsumer struct {
 	stop                chan struct{}
 }
 
+// NewPartitionConsumer creates a new PartitionConsumer for given client and config that will
+// consume given topic and partition.
+// The message processing logic is passed via strategy.
 func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
 	return &PartitionConsumer{
 		client:    client,
@@ -52,6 +73,8 @@ func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, p
 	}
 }
 
+// Start starts consuming a single partition from Kafka.
+// This call blocks until Stop() is called.
 func (pc *PartitionConsumer) Start() {
 	proceed := pc.initOffset()
 	if !proceed {
@@ -88,7 +111,7 @@ func (pc *PartitionConsumer) Start() {
 
 				//TODO siesta could probably support size hints? feel like quick traversal of messages should be quicker
 				// than appending to a slice if it resizes internally, should benchmark this
-				messages := make([]*MessageAndMetadata, 0)
+				var messages []*MessageAndMetadata
 				collector := pc.collectorFunc(&messages)
 				err := response.CollectMessages(collector)
 
@@ -101,22 +124,29 @@ func (pc *PartitionConsumer) Start() {
 	}
 }
 
+// Stop stops consuming partition from Kafka.
 func (pc *PartitionConsumer) Stop() {
 	pc.stop <- struct{}{}
 }
 
+// Commit commits the given offset to Kafka. Returns an error on unsuccessful commit.
 func (pc *PartitionConsumer) Commit(offset int64) error {
 	return pc.client.CommitOffset(pc.config.Group, pc.topic, pc.partition, offset)
 }
 
+// SetOffset overrides the current fetch offset value for given topic/partition.
+// This does not commit offset but allows you to move back and forth throughout the partition.
 func (pc *PartitionConsumer) SetOffset(offset int64) {
 	atomic.StoreInt64(&pc.offset, offset)
 }
 
+// Offset returns the last fetched offset for this partition consumer.
 func (pc *PartitionConsumer) Offset() int64 {
 	return atomic.LoadInt64(&pc.offset)
 }
 
+// Lag returns the difference between the latest available offset in the partition and the
+// latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 func (pc *PartitionConsumer) Lag() int64 {
 	return atomic.LoadInt64(&pc.highwaterMarkOffset) - atomic.LoadInt64(&pc.offset)
 }
@@ -193,4 +223,12 @@ func (pc *PartitionConsumer) collectorFunc(messages *[]*MessageAndMetadata) func
 	}
 }
 
+// Strategy is a function that actually processes Kafka messages.
+// FetchData contains actual messages, highwater mark offset and fetch error.
+// PartitionConsumer which is passed to this function allows to commit/rewind offset if necessary,
+// track offset/lag, stop the consumer. Please note that you should NOT stop the consumer if using
+// Consumer but rather use consumer.Remove(topic, partition) call.
+// The processing happens on per-partition level - the amount of strategies running simultaneously is defined by the
+// number of partitions being consumed. The next batch for topic/partition won't start until the previous one
+// finishes.
 type Strategy func(data *FetchData, consumer *PartitionConsumer)

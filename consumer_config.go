@@ -17,13 +17,25 @@ package gonzo
 
 import "github.com/stealthly/siesta"
 
+// ConsumerConfig provides configuration options for both Consumer and PartitionConsumer.
 type ConsumerConfig struct {
-	Group           string
-	KeyDecoder      Decoder
-	ValueDecoder    Decoder
+	// Group is a string that uniquely identifies a set of consumers within the same consumer group.
+	Group string
+
+	// KeyDecoder is a function that turns plain bytes into a decoded message key.
+	KeyDecoder Decoder
+
+	// ValueDecoder is a function that turns plain bytes into a decoded message value.
+	ValueDecoder Decoder
+
+	// AutoOffsetReset defines what to do when there is no committed offset or committed offset is out of range.
+	// siesta.EarliestTime - automatically reset the offset to the smallest offset.
+	// siesta.LatestTime - automatically reset the offset to the largest offset.
+	// Defaults to siesta.EarliestTime.
 	AutoOffsetReset int64
 }
 
+// NewConsumerConfig creates a consumer config with sane defaults.
 func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
 		Group:           "gonzo-group",

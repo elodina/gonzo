@@ -33,7 +33,8 @@ func TestConsumerAssignments(t *testing.T) {
 	assertFatal(t, len(assignments), 0)
 
 	// add one
-	consumer.Add("test", 0)
+	err := consumer.Add("test", 0)
+	assertFatal(t, err, nil)
 	assignments = consumer.Assignment()
 	_, exists := assignments["test"]
 	assertFatal(t, exists, true)
@@ -41,12 +42,14 @@ func TestConsumerAssignments(t *testing.T) {
 	assertFatal(t, assignments["test"][0], int32(0))
 
 	// add existing
-	consumer.Add("test", 0)
+	err = consumer.Add("test", 0)
+	assertNot(t, err, nil)
 	assignments = consumer.Assignment()
 	assertFatal(t, len(assignments), 1)
 
 	// add another
-	consumer.Add("test1", 1)
+	err = consumer.Add("test1", 1)
+	assertFatal(t, err, nil)
 	assignments = consumer.Assignment()
 	_, exists = assignments["test1"]
 	assertFatal(t, exists, true)
@@ -56,22 +59,26 @@ func TestConsumerAssignments(t *testing.T) {
 	assertFatal(t, len(assignments), 2)
 
 	// remove one
-	consumer.Remove("test", 0)
+	err = consumer.Remove("test", 0)
+	assertFatal(t, err, nil)
 	assignments = consumer.Assignment()
 	assertFatal(t, len(assignments), 1)
 
 	// remove non existing
-	consumer.Remove("test", 0)
+	err = consumer.Remove("test", 0)
+	assertNot(t, err, nil)
 	assignments = consumer.Assignment()
 	assertFatal(t, len(assignments), 1)
 
 	// remove one that never existed
-	consumer.Remove("asdasd", 32)
+	err = consumer.Remove("asdasd", 32)
+	assertNot(t, err, nil)
 	assignments = consumer.Assignment()
 	assertFatal(t, len(assignments), 1)
 
 	// remove last
-	consumer.Remove("test1", 1)
+	err = consumer.Remove("test1", 1)
+	assertFatal(t, err, nil)
 	assignments = consumer.Assignment()
 	assertFatal(t, len(assignments), 0)
 }
@@ -90,7 +97,8 @@ func TestConsumerOffset(t *testing.T) {
 	}
 
 	// add partition consumer and ensure it has offset 0 and no error
-	consumer.Add("test", 0)
+	err = consumer.Add("test", 0)
+	assertFatal(t, err, nil)
 	offset, err = consumer.Offset("test", 0)
 	assert(t, offset, int64(0))
 	assert(t, err, nil)
@@ -140,7 +148,8 @@ func TestConsumerSetOffset(t *testing.T) {
 	seekOffset := int64(123)
 
 	// add a topic-partition and make sure SetOffset overrides offset
-	consumer.Add(topic, partition)
+	err = consumer.Add(topic, partition)
+	assertFatal(t, err, nil)
 	offset, err = consumer.Offset(topic, partition)
 	assert(t, offset, int64(0))
 	assert(t, err, nil)
@@ -168,7 +177,8 @@ func TestConsumerLag(t *testing.T) {
 	topic := "test"
 	partition := int32(0)
 
-	consumer.Add(topic, partition)
+	err = consumer.Add(topic, partition)
+	assertFatal(t, err, nil)
 	lag, err = consumer.Lag(topic, partition)
 	assert(t, lag, int64(0))
 	assert(t, err, nil)
@@ -193,7 +203,8 @@ func TestConsumerAwaitTermination(t *testing.T) {
 		success <- struct{}{}
 	}()
 
-	consumer.Add("test", 0)
+	err := consumer.Add("test", 0)
+	assertFatal(t, err, nil)
 	consumer.Stop()
 	select {
 	case <-success:
@@ -225,7 +236,8 @@ func TestConsumerJoin(t *testing.T) {
 	}
 
 	// add one topic/partition and make sure Join does not unblock before we need it to
-	consumer.Add(topic, partition)
+	err := consumer.Add(topic, partition)
+	assertFatal(t, err, nil)
 
 	go func() {
 		consumer.Join()
@@ -239,7 +251,8 @@ func TestConsumerJoin(t *testing.T) {
 	}
 
 	//now remove topic-partition and make sure Join now unblocks fine
-	consumer.Remove(topic, partition)
+	err = consumer.Remove(topic, partition)
+	assertFatal(t, err, nil)
 
 	select {
 	case <-success:

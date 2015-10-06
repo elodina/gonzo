@@ -23,11 +23,11 @@ import (
 	"strings"
 )
 
-//Logger used by this client. Defaults to build-in logger with Info log level.
-var Logger GonzoLogger = NewDefaultLogger(InfoLevel)
+// Logger used by this client. Defaults to build-in logger with Info log level.
+var Logger Log = NewDefaultLogger(InfoLevel)
 
-// GonzoLogger is a logger interface. Lets you plug-in your custom logging library instead of using built-in one.
-type GonzoLogger interface {
+// Log is a logger interface. Lets you plug-in your custom logging library instead of using built-in one.
+type Log interface {
 	//Formats a given message according to given params to log with level Trace.
 	Trace(message string, params ...interface{})
 
@@ -130,7 +130,7 @@ func caller() string {
 		funcTokens := strings.Split(f.Name(), "/")
 		fun := funcTokens[len(funcTokens)-1]
 		return fmt.Sprintf("[%s:%d|%s]", file, line, fun[strings.Index(fun, ".")+1:])
-	} else {
-		return "???"
 	}
+
+	return "???"
 }
