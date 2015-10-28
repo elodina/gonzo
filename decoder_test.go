@@ -15,7 +15,10 @@ limitations under the License. */
 
 package gonzo
 
-import "testing"
+import (
+	"gopkg.in/stretchr/testify.v1/assert"
+	"testing"
+)
 
 func TestDecoders(t *testing.T) {
 	// normal bytes
@@ -23,28 +26,32 @@ func TestDecoders(t *testing.T) {
 	byteDecoder := new(ByteDecoder)
 	decodedBytes, err := byteDecoder.Decode(bytes)
 
-	assertFatal(t, err, nil)
-	assert(t, decodedBytes, bytes)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, bytes, decodedBytes)
+	//	assert(t, decodedBytes, bytes)
 
 	// empty bytes
 	bytes = nil
 	decodedBytes, err = byteDecoder.Decode(bytes)
 
-	assertFatal(t, err, nil)
-	assert(t, decodedBytes, bytes)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, bytes, decodedBytes)
+	//	assert(t, decodedBytes, bytes)
 
 	// normal string
 	str := "hello world"
 	stringDecoder := new(StringDecoder)
 	decodedString, err := stringDecoder.Decode([]byte(str))
 
-	assertFatal(t, err, nil)
-	assert(t, decodedString, str)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, str, decodedString)
+	//	assert(t, decodedString, str)
 
 	// empty string
 	str = ""
 	decodedString, err = stringDecoder.Decode([]byte(str))
 
-	assertFatal(t, err, nil)
-	assert(t, decodedString, str)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, str, decodedString)
+	//	assert(t, decodedString, str)
 }

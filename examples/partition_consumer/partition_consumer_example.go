@@ -35,7 +35,7 @@ func main() {
 	consumer.Start()
 }
 
-func partitionConsumerStrategy(data *gonzo.FetchData, consumer *gonzo.PartitionConsumer) {
+func partitionConsumerStrategy(data *gonzo.FetchData, consumer *gonzo.KafkaPartitionConsumer) {
 	if data.Error != nil {
 		panic(data.Error)
 	}

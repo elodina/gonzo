@@ -16,104 +16,105 @@ limitations under the License. */
 package gonzo
 
 import (
+	"gopkg.in/stretchr/testify.v1/assert"
 	"strings"
 	"testing"
 	"time"
 )
 
-var NoOpStrategy = func(data *FetchData, consumer *PartitionConsumer) {}
+var NoOpStrategy = func(data *FetchData, consumer *KafkaPartitionConsumer) {}
 
 func TestConsumerAssignments(t *testing.T) {
 	client := NewMockClient(0, 0)
 	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// no assignments
 	assignments := consumer.Assignment()
-	assertFatal(t, len(assignments), 0)
+	assert.Len(t, assignments, 0)
 
 	// add one
 	err := consumer.Add("test", 0)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	assignments = consumer.Assignment()
 	_, exists := assignments["test"]
-	assertFatal(t, exists, true)
-	assertFatal(t, len(assignments["test"]), 1)
-	assertFatal(t, assignments["test"][0], int32(0))
+	assert.True(t, exists)
+	assert.Len(t, assignments["test"], 1)
+	assert.Equal(t, int32(0), assignments["test"][0])
 
 	// add existing
 	err = consumer.Add("test", 0)
-	assertNot(t, err, nil)
+	assert.NotEqual(t, nil, err)
 	assignments = consumer.Assignment()
-	assertFatal(t, len(assignments), 1)
+	assert.Len(t, assignments, 1)
 
 	// add another
 	err = consumer.Add("test1", 1)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	assignments = consumer.Assignment()
 	_, exists = assignments["test1"]
-	assertFatal(t, exists, true)
-	assertFatal(t, len(assignments["test1"]), 1)
-	assertFatal(t, assignments["test1"][0], int32(1))
+	assert.True(t, exists)
+	assert.Len(t, assignments["test1"], 1)
+	assert.Equal(t, int32(1), assignments["test1"][0])
 
-	assertFatal(t, len(assignments), 2)
+	assert.Len(t, assignments, 2)
 
 	// remove one
 	err = consumer.Remove("test", 0)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	assignments = consumer.Assignment()
-	assertFatal(t, len(assignments), 1)
+	assert.Len(t, assignments, 1)
 
 	// remove non existing
 	err = consumer.Remove("test", 0)
-	assertNot(t, err, nil)
+	assert.NotEqual(t, nil, err)
 	assignments = consumer.Assignment()
-	assertFatal(t, len(assignments), 1)
+	assert.Len(t, assignments, 1)
 
 	// remove one that never existed
 	err = consumer.Remove("asdasd", 32)
-	assertNot(t, err, nil)
+	assert.NotEqual(t, nil, err)
 	assignments = consumer.Assignment()
-	assertFatal(t, len(assignments), 1)
+	assert.Len(t, assignments, 1)
 
 	// remove last
 	err = consumer.Remove("test1", 1)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	assignments = consumer.Assignment()
-	assertFatal(t, len(assignments), 0)
+	assert.Len(t, assignments, 0)
 }
 
 func TestConsumerOffset(t *testing.T) {
 	client := NewMockClient(0, 0)
 	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// offset for non-existing
 	offset, err := consumer.Offset("asd", 0)
-	assert(t, offset, int64(-1))
-	assertNot(t, err, nil)
+	assert.Equal(t, int64(-1), offset)
+	assert.NotEqual(t, nil, err)
 	if !strings.Contains(err.Error(), "does not exist") {
 		t.Fatalf("Error message should contain 'does not exist' text")
 	}
 
 	// add partition consumer and ensure it has offset 0 and no error
 	err = consumer.Add("test", 0)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	offset, err = consumer.Offset("test", 0)
-	assert(t, offset, int64(0))
-	assert(t, err, nil)
+	assert.Equal(t, int64(0), offset)
+	assert.Equal(t, nil, err)
 
 	// move offset and ensure Offset returns this value
 	expectedOffset := int64(123)
-	consumer.partitionConsumers["test"][0].(*MockPartitionConsumer).offset = expectedOffset
+	consumer.(*KafkaConsumer).partitionConsumers["test"][0].(*MockPartitionConsumer).offset = expectedOffset
 	offset, err = consumer.Offset("test", 0)
-	assert(t, offset, expectedOffset)
-	assert(t, err, nil)
+	assert.Equal(t, expectedOffset, offset)
+	assert.Equal(t, nil, err)
 
 	// offset for existing topic but non-existing partition should return error
 	offset, err = consumer.Offset("test", 1)
-	assert(t, offset, int64(-1))
-	assertNot(t, err, nil)
+	assert.Equal(t, int64(-1), offset)
+	assert.NotEqual(t, nil, err)
 	if !strings.Contains(err.Error(), "does not exist") {
 		t.Fatalf("Error message should contain 'does not exist' text")
 	}
@@ -123,18 +124,18 @@ func TestConsumerCommitOffset(t *testing.T) {
 	client := NewMockClient(0, 0)
 	config := NewConsumerConfig()
 	consumer := NewConsumer(client, config, NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	err := consumer.Commit("asd", 0, 123)
-	assert(t, err, nil)
-	assert(t, client.commitCount[config.Group]["asd"][0], 1) //expect one commit
-	assert(t, client.offsets[config.Group]["asd"][0], int64(123))
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 1, client.commitCount[config.Group]["asd"][0]) //expect one commit
+	assert.Equal(t, int64(123), client.offsets[config.Group]["asd"][0])
 }
 
 func TestConsumerSetOffset(t *testing.T) {
 	client := NewMockClient(0, 0)
 	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// set for non-existing
 	err := consumer.SetOffset("asd", 0, 123)
@@ -149,27 +150,27 @@ func TestConsumerSetOffset(t *testing.T) {
 
 	// add a topic-partition and make sure SetOffset overrides offset
 	err = consumer.Add(topic, partition)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	offset, err = consumer.Offset(topic, partition)
-	assert(t, offset, int64(0))
-	assert(t, err, nil)
+	assert.Equal(t, int64(0), offset)
+	assert.Equal(t, nil, err)
 
 	err = consumer.SetOffset(topic, partition, seekOffset)
-	assert(t, err, nil)
+	assert.Equal(t, nil, err)
 
 	offset, err = consumer.Offset(topic, partition)
-	assert(t, offset, seekOffset)
-	assert(t, err, nil)
+	assert.Equal(t, seekOffset, offset)
+	assert.Equal(t, nil, err)
 }
 
 func TestConsumerLag(t *testing.T) {
 	client := NewMockClient(0, 0)
 	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// lag for non-existing
 	lag, err := consumer.Lag("asd", 0)
-	assert(t, lag, int64(-1))
+	assert.Equal(t, int64(-1), lag)
 	if !strings.Contains(err.Error(), "does not exist") {
 		t.Fatalf("Error message should contain 'does not exist' text")
 	}
@@ -178,24 +179,24 @@ func TestConsumerLag(t *testing.T) {
 	partition := int32(0)
 
 	err = consumer.Add(topic, partition)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	lag, err = consumer.Lag(topic, partition)
-	assert(t, lag, int64(0))
-	assert(t, err, nil)
+	assert.Equal(t, int64(0), lag)
+	assert.Equal(t, nil, err)
 
 	// move lag value and ensure Lag returns this value
 	expectedLag := int64(123)
-	consumer.partitionConsumers[topic][partition].(*MockPartitionConsumer).lag = expectedLag
+	consumer.(*KafkaConsumer).partitionConsumers[topic][partition].(*MockPartitionConsumer).lag = expectedLag
 	lag, err = consumer.Lag(topic, partition)
-	assert(t, lag, expectedLag)
-	assert(t, err, nil)
+	assert.Equal(t, expectedLag, lag)
+	assert.Equal(t, nil, err)
 }
 
 func TestConsumerAwaitTermination(t *testing.T) {
 	timeout := time.Second
 	client := NewMockClient(0, 0)
 	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	success := make(chan struct{})
 	go func() {
@@ -204,7 +205,7 @@ func TestConsumerAwaitTermination(t *testing.T) {
 	}()
 
 	err := consumer.Add("test", 0)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 	consumer.Stop()
 	select {
 	case <-success:
@@ -220,7 +221,7 @@ func TestConsumerJoin(t *testing.T) {
 
 	client := NewMockClient(0, 0)
 	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
-	consumer.partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	success := make(chan struct{})
 
@@ -237,7 +238,7 @@ func TestConsumerJoin(t *testing.T) {
 
 	// add one topic/partition and make sure Join does not unblock before we need it to
 	err := consumer.Add(topic, partition)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 
 	go func() {
 		consumer.Join()
@@ -252,7 +253,7 @@ func TestConsumerJoin(t *testing.T) {
 
 	//now remove topic-partition and make sure Join now unblocks fine
 	err = consumer.Remove(topic, partition)
-	assertFatal(t, err, nil)
+	assert.Equal(t, nil, err)
 
 	select {
 	case <-success:

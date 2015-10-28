@@ -23,7 +23,7 @@ import (
 
 // PartitionConsumerInterface is an interface responsible for consuming exactly one topic/partition
 // from Kafka. Used to switch between PartitionConsumer in live mode and MockPartitionConsumer in tests.
-type PartitionConsumerInterface interface {
+type PartitionConsumer interface {
 	// Start starts consuming given topic/partition.
 	Start()
 
@@ -48,7 +48,7 @@ type PartitionConsumerInterface interface {
 // PartitionConsumer serves to consume exactly one topic/partition from Kafka.
 // This is very similar to JVM SimpleConsumer except the PartitionConsumer is able to handle
 // leader changes and supports committing offsets to Kafka via Siesta client.
-type PartitionConsumer struct {
+type KafkaPartitionConsumer struct {
 	client              Client
 	config              *ConsumerConfig
 	topic               string
@@ -62,8 +62,8 @@ type PartitionConsumer struct {
 // NewPartitionConsumer creates a new PartitionConsumer for given client and config that will
 // consume given topic and partition.
 // The message processing logic is passed via strategy.
-func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
-	return &PartitionConsumer{
+func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumer {
+	return &KafkaPartitionConsumer{
 		client:    client,
 		config:    config,
 		topic:     topic,
@@ -75,7 +75,7 @@ func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, p
 
 // Start starts consuming a single partition from Kafka.
 // This call blocks until Stop() is called.
-func (pc *PartitionConsumer) Start() {
+func (pc *KafkaPartitionConsumer) Start() {
 	proceed := pc.initOffset()
 	if !proceed {
 		return
@@ -125,33 +125,33 @@ func (pc *PartitionConsumer) Start() {
 }
 
 // Stop stops consuming partition from Kafka.
-func (pc *PartitionConsumer) Stop() {
+func (pc *KafkaPartitionConsumer) Stop() {
 	pc.stop <- struct{}{}
 }
 
 // Commit commits the given offset to Kafka. Returns an error on unsuccessful commit.
-func (pc *PartitionConsumer) Commit(offset int64) error {
+func (pc *KafkaPartitionConsumer) Commit(offset int64) error {
 	return pc.client.CommitOffset(pc.config.Group, pc.topic, pc.partition, offset)
 }
 
 // SetOffset overrides the current fetch offset value for given topic/partition.
 // This does not commit offset but allows you to move back and forth throughout the partition.
-func (pc *PartitionConsumer) SetOffset(offset int64) {
+func (pc *KafkaPartitionConsumer) SetOffset(offset int64) {
 	atomic.StoreInt64(&pc.offset, offset)
 }
 
 // Offset returns the last fetched offset for this partition consumer.
-func (pc *PartitionConsumer) Offset() int64 {
+func (pc *KafkaPartitionConsumer) Offset() int64 {
 	return atomic.LoadInt64(&pc.offset)
 }
 
 // Lag returns the difference between the latest available offset in the partition and the
 // latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
-func (pc *PartitionConsumer) Lag() int64 {
+func (pc *KafkaPartitionConsumer) Lag() int64 {
 	return atomic.LoadInt64(&pc.highwaterMarkOffset) - atomic.LoadInt64(&pc.offset)
 }
 
-func (pc *PartitionConsumer) initOffset() bool {
+func (pc *KafkaPartitionConsumer) initOffset() bool {
 	for {
 		offset, err := pc.client.GetOffset(pc.config.Group, pc.topic, pc.partition)
 		if err != nil {
@@ -176,7 +176,7 @@ func (pc *PartitionConsumer) initOffset() bool {
 	}
 }
 
-func (pc *PartitionConsumer) resetOffset() bool {
+func (pc *KafkaPartitionConsumer) resetOffset() bool {
 	for {
 		offset, err := pc.client.GetAvailableOffset(pc.topic, pc.partition, pc.config.AutoOffsetReset)
 		if err != nil {
@@ -198,7 +198,7 @@ func (pc *PartitionConsumer) resetOffset() bool {
 	}
 }
 
-func (pc *PartitionConsumer) collectorFunc(messages *[]*MessageAndMetadata) func(topic string, partition int32, offset int64, key []byte, value []byte) {
+func (pc *KafkaPartitionConsumer) collectorFunc(messages *[]*MessageAndMetadata) func(topic string, partition int32, offset int64, key []byte, value []byte) {
 	return func(topic string, partition int32, offset int64, key []byte, value []byte) {
 		decodedKey, err := pc.config.KeyDecoder.Decode(key)
 		if err != nil {
@@ -231,4 +231,4 @@ func (pc *PartitionConsumer) collectorFunc(messages *[]*MessageAndMetadata) func
 // The processing happens on per-partition level - the amount of strategies running simultaneously is defined by the
 // number of partitions being consumed. The next batch for topic/partition won't start until the previous one
 // finishes.
-type Strategy func(data *FetchData, consumer *PartitionConsumer)
+type Strategy func(data *FetchData, consumer *KafkaPartitionConsumer)

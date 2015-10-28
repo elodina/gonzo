@@ -37,7 +37,7 @@ func main() {
 	consumer.Join()
 }
 
-func consumerStrategy(data *gonzo.FetchData, consumer *gonzo.PartitionConsumer) {
+func consumerStrategy(data *gonzo.FetchData, consumer *gonzo.KafkaPartitionConsumer) {
 	if data.Error != nil {
 		panic(data.Error)
 	}

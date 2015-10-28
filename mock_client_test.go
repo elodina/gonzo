@@ -18,6 +18,7 @@ package gonzo
 import (
 	"fmt"
 	"github.com/stealthly/siesta"
+	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 )
 
@@ -145,38 +146,16 @@ func (mc *MockClient) initCommitCounts(group string, topic string, partition int
 func TestMockClientGoodFetch(t *testing.T) {
 	client := NewMockClient(0, 200)
 	response, err := client.Fetch("test", 0, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err)
-	}
-
-	if len(response.Data) != 1 {
-		t.Fatalf("response.Data length should be 1, actual %d", len(response.Data))
-	}
-
-	if len(response.Data["test"]) != 1 {
-		t.Fatalf(`response.Data["test"] length should be 1, actual %d`, len(response.Data["test"]))
-	}
-
-	if response.Data["test"][0].Error != siesta.ErrNoError {
-		t.Fatalf(`Unexpected error at response.Data["test"][0].Error: %s`, response.Data["test"][0].Error)
-	}
-
-	if len(response.Data["test"][0].Messages) != int(client.fetchSize) {
-		t.Fatalf(`response.Data["test"][0].Messages length should be 100, actual %d`, len(response.Data["test"][0].Messages))
-	}
-
-	if response.Data["test"][0].HighwaterMarkOffset != client.highwaterMarkOffset {
-		t.Fatalf(`response.Data["test"][0].HighwaterMarkOffset should be 200, actual %d`, response.Data["test"][0].HighwaterMarkOffset)
-	}
+	assert.Equal(t, nil, err)
+	assert.Len(t, response.Data, 1)
+	assert.Len(t, response.Data["test"], 1)
+	assert.Equal(t, siesta.ErrNoError, response.Data["test"][0].Error)
+	assert.Len(t, response.Data["test"][0].Messages, int(client.fetchSize))
+	assert.Equal(t, client.highwaterMarkOffset, response.Data["test"][0].HighwaterMarkOffset)
 
 	for i := 0; i < 100; i++ {
-		if response.Data["test"][0].Messages[i].Offset != int64(i) {
-			t.Fatalf(`response.Data["test"][0].Messages[%d].Offset length should be %d, actual %d`, i, i, response.Data["test"][0].Messages[i].Offset)
-		}
-
-		if string(response.Data["test"][0].Messages[i].Message.Value) != fmt.Sprintf("message-%d", i) {
-			t.Fatalf(`string(response.Data["test"][0].Messages[i].Message.Value) should be %s, actual %s`, fmt.Sprintf("message-%d", i), string(response.Data["test"][0].Messages[i].Message.Value))
-		}
+		assert.Equal(t, int64(i), response.Data["test"][0].Messages[i].Offset)
+		assert.Equal(t, fmt.Sprintf("message-%d", i), string(response.Data["test"][0].Messages[i].Message.Value))
 	}
 }
 
@@ -184,21 +163,8 @@ func TestMockClientBadFetch(t *testing.T) {
 	client := NewMockClient(0, 100)
 	client.fetchResponseError = siesta.ErrBrokerNotAvailable
 	response, err := client.Fetch("test", 0, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err)
-	}
-
-	if len(response.Data) != 1 {
-		t.Fatalf("response.Data length should be 1, actual %d", len(response.Data))
-	}
-
-	if len(response.Data["test"]) != 1 {
-		t.Fatalf(`response.Data["test"] length should be 1, actual %d`, len(response.Data["test"]))
-	}
-
-	if response.Data["test"][0].Error != siesta.ErrBrokerNotAvailable {
-		t.Fatalf(`response.Data["test"][0].Error should be %s, actual %s`, siesta.ErrBrokerNotAvailable, response.Data["test"][0].Error)
-	}
-
-	response.GetMessages()
+	assert.Equal(t, nil, err)
+	assert.Len(t, response.Data, 1)
+	assert.Len(t, response.Data["test"], 1)
+	assert.Equal(t, siesta.ErrBrokerNotAvailable, response.Data["test"][0].Error)
 }

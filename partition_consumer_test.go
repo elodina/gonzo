@@ -18,6 +18,7 @@ package gonzo
 import (
 	"fmt"
 	"github.com/stealthly/siesta"
+	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ type MockPartitionConsumer struct {
 	lag    int64
 }
 
-func NewMockPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumerInterface {
+func NewMockPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumer {
 	return new(MockPartitionConsumer)
 }
 
@@ -63,17 +64,17 @@ func TestPartitionConsumerSingleFetch(t *testing.T) {
 	topic := "test"
 	partition := int32(0)
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		for i, msg := range data.Messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", i))
-			assert(t, msg.Topic, topic)
-			assert(t, msg.Partition, partition)
-			assert(t, msg.Offset, int64(i))
+			assert.Equal(t, fmt.Sprintf("message-%d", i), string(msg.Value))
+			assert.Equal(t, topic, msg.Topic)
+			assert.Equal(t, partition, msg.Partition)
+			assert.Equal(t, int64(i), msg.Offset)
 		}
 
-		assertFatal(t, len(data.Messages), 100)
+		assert.Len(t, data.Messages, 100)
 		consumer.Stop()
 	}
 
@@ -89,13 +90,13 @@ func TestPartitionConsumerMultipleFetchesFromStart(t *testing.T) {
 	expectedMessages := 512
 	actualMessages := 0
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		for _, msg := range data.Messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
-			assert(t, msg.Topic, topic)
-			assert(t, msg.Partition, partition)
+			assert.Equal(t, fmt.Sprintf("message-%d", msg.Offset), string(msg.Value))
+			assert.Equal(t, topic, msg.Topic)
+			assert.Equal(t, partition, msg.Partition)
 		}
 
 		actualMessages += len(data.Messages)
@@ -118,13 +119,13 @@ func TestPartitionConsumerMultipleFetches(t *testing.T) {
 	expectedMessages := 512
 	actualMessages := 0
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		for _, msg := range data.Messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
-			assert(t, msg.Topic, topic)
-			assert(t, msg.Partition, partition)
+			assert.Equal(t, fmt.Sprintf("message-%d", msg.Offset), string(msg.Value))
+			assert.Equal(t, topic, msg.Topic)
+			assert.Equal(t, partition, msg.Partition)
 		}
 
 		actualMessages += len(data.Messages)
@@ -146,13 +147,13 @@ func TestPartitionConsumerEmptyFetch(t *testing.T) {
 	expectedMessages := 512
 	actualMessages := 0
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		for _, msg := range data.Messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
-			assert(t, msg.Topic, topic)
-			assert(t, msg.Partition, partition)
+			assert.Equal(t, fmt.Sprintf("message-%d", msg.Offset), string(msg.Value))
+			assert.Equal(t, topic, msg.Topic)
+			assert.Equal(t, partition, msg.Partition)
 		}
 
 		actualMessages += len(data.Messages)
@@ -170,8 +171,8 @@ func TestPartitionConsumerEmptyFetch(t *testing.T) {
 }
 
 func TestPartitionConsumerFetchError(t *testing.T) {
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, siesta.ErrEOF)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, siesta.ErrEOF, data.Error)
 
 		consumer.Stop()
 	}
@@ -190,11 +191,11 @@ func TestPartitionConsumerFetchResponseError(t *testing.T) {
 	expectedMessages := 200
 	actualMessages := 0
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		for _, msg := range data.Messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
+			assert.Equal(t, fmt.Sprintf("message-%d", msg.Offset), string(msg.Value))
 		}
 
 		actualMessages += len(data.Messages)
@@ -217,11 +218,11 @@ func TestPartitionConsumerGetOffsetErrors(t *testing.T) {
 	expectedMessages := 200
 	actualMessages := 0
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		for _, msg := range data.Messages {
-			assert(t, string(msg.Value), fmt.Sprintf("message-%d", msg.Offset))
+			assert.Equal(t, fmt.Sprintf("message-%d", msg.Offset), string(msg.Value))
 		}
 
 		actualMessages += len(data.Messages)
@@ -246,7 +247,7 @@ func TestPartitionConsumerStopOnInitOffset(t *testing.T) {
 	partition := int32(0)
 	expectedMessages := 200
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
 		t.Fatal("Should not reach here")
 	}
 
@@ -269,7 +270,7 @@ func TestPartitionConsumerStopOnOffsetReset(t *testing.T) {
 	partition := int32(0)
 	expectedMessages := 200
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
 		t.Fatal("Should not reach here")
 	}
 
@@ -293,10 +294,10 @@ func TestPartitionConsumerOffsetAndLag(t *testing.T) {
 	startOffset := 134
 	highwaterMarkOffset := 17236
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
-		assert(t, consumer.Offset(), int64(startOffset+len(data.Messages)))
-		assert(t, consumer.Lag(), int64(highwaterMarkOffset-(startOffset+len(data.Messages))))
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
+		assert.Equal(t, int64(startOffset+len(data.Messages)), consumer.Offset())
+		assert.Equal(t, int64(highwaterMarkOffset-(startOffset+len(data.Messages))), consumer.Lag())
 
 		consumer.Stop()
 	}
@@ -313,10 +314,10 @@ func TestPartitionConsumerSetOffset(t *testing.T) {
 	startOffset := 134
 	setOffsetDone := false
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
-		assert(t, data.Messages[0].Offset, int64(startOffset))
+		assert.Equal(t, int64(startOffset), data.Messages[0].Offset)
 
 		if setOffsetDone {
 			consumer.Stop()
@@ -340,8 +341,8 @@ func TestPartitionConsumerCommit(t *testing.T) {
 	startOffset := 134
 	hwOffset := int64(startOffset + 100)
 
-	strategy := func(data *FetchData, consumer *PartitionConsumer) {
-		assertFatal(t, data.Error, nil)
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
 
 		consumer.Commit(data.Messages[len(data.Messages)-1].Offset)
 		consumer.Stop()
@@ -350,10 +351,13 @@ func TestPartitionConsumerCommit(t *testing.T) {
 	client := NewMockClient(int64(startOffset), hwOffset)
 	consumer := NewPartitionConsumer(client, config, topic, partition, strategy)
 	client.initOffsets(config.Group, topic, partition)
-	assertFatal(t, client.offsets[config.Group][topic][partition], int64(0))
+	assert.Equal(t, int64(0), client.offsets[config.Group][topic][partition])
+	//	assertFatal(t, client.offsets[config.Group][topic][partition], int64(0))
 
 	consumer.Start()
-	assertFatal(t, client.offsets[config.Group][topic][partition], hwOffset-1)
+	assert.Equal(t, hwOffset-1, client.offsets[config.Group][topic][partition])
+	//	assertFatal(t, client.offsets[config.Group][topic][partition], hwOffset-1)
 
-	assertFatal(t, client.commitCount[config.Group][topic][partition], 1)
+	assert.Equal(t, 1, client.commitCount[config.Group][topic][partition])
+	//	assertFatal(t, client.commitCount[config.Group][topic][partition], 1)
 }
