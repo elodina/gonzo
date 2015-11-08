@@ -18,7 +18,6 @@ package tcp
 import (
 	"encoding/json"
 	"errors"
-	"github.com/elodina/gonzo"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"regexp"
 	"testing"
@@ -27,17 +26,6 @@ import (
 
 var addr = "0.0.0.0:61721"
 var timeout = time.Second
-
-func TestTCPConsumerStart(t *testing.T) {
-	gonzo.Logger = gonzo.NewDefaultLogger(gonzo.DebugLevel)
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	tcpConsumer.Stop()
-}
 
 func TestTCPConsumerStartBadCases(t *testing.T) {
 	consumer := NewMockConsumer()
@@ -58,7 +46,7 @@ func TestTCPConsumerStartBadCases(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(".*connection refused.*"), err.Error())
 }
 
-func TestTCPConsumerAdd(t *testing.T) {
+func TestTCPConsumer(t *testing.T) {
 	consumer := NewMockConsumer()
 
 	tcpConsumer := NewConsumer(addr, consumer)
@@ -68,6 +56,7 @@ func TestTCPConsumerAdd(t *testing.T) {
 	client, err := NewClient(addr)
 	assert.Equal(t, nil, err)
 
+	// add
 	// good case
 	err = client.Add("asd", 1)
 	assert.Equal(t, nil, err)
@@ -76,23 +65,7 @@ func TestTCPConsumerAdd(t *testing.T) {
 	err = client.Add("asd", 1)
 	assert.Regexp(t, regexp.MustCompile(".*already exists.*"), err.Error())
 
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerRemove(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
-	assert.Equal(t, nil, err)
-
-	// add first
-	err = client.Add("asd", 1)
-	assert.Equal(t, nil, err)
-
+	// remove
 	// good case
 	err = client.Remove("asd", 1)
 	assert.Equal(t, nil, err)
@@ -101,19 +74,7 @@ func TestTCPConsumerRemove(t *testing.T) {
 	err = client.Remove("asd", 1)
 	assert.Regexp(t, regexp.MustCompile(".*does not exist.*"), err.Error())
 
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerAssignments(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
-	assert.Equal(t, nil, err)
-
+	// assignments
 	// empty assignments
 	assignments, err := client.Assignment()
 	assert.Equal(t, nil, err)
@@ -136,19 +97,7 @@ func TestTCPConsumerAssignments(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Empty(t, assignments)
 
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerCommit(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
-	assert.Equal(t, nil, err)
-
+	// commit
 	// commit something
 	err = client.Commit("asd", 1, 123)
 	assert.Equal(t, nil, err)
@@ -157,32 +106,21 @@ func TestTCPConsumerCommit(t *testing.T) {
 	consumer.commitOffsetError = errors.New("boom")
 	err = client.Commit("asd", 1, 123)
 	assert.Regexp(t, regexp.MustCompile(".*boom.*"), err)
+	consumer.commitOffsetError = nil
 
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerOffset(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
-	assert.Equal(t, nil, err)
-
+	// get offset
 	// non-existing
 	_, err = client.Offset("asd", 1)
 	assert.Regexp(t, regexp.MustCompile(".*does not exist.*"), err.Error())
 
-	// add first
+	// add back
 	err = client.Add("asd", 1)
 	assert.Equal(t, nil, err)
 
 	// check again
 	offset, err := client.Offset("asd", 1)
 	assert.Equal(t, nil, err)
-	assert.Equal(t, int64(0), offset)
+	assert.Equal(t, int64(123), offset)
 
 	// commit offset
 	err = client.Commit("asd", 1, 234)
@@ -193,17 +131,9 @@ func TestTCPConsumerOffset(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, int64(234), offset)
 
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerSetOffset(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
+	// set offset
+	// remove previous
+	err = client.Remove("asd", 1)
 	assert.Equal(t, nil, err)
 
 	// non-existing
@@ -219,21 +149,13 @@ func TestTCPConsumerSetOffset(t *testing.T) {
 	assert.Equal(t, nil, err)
 
 	// get offset
-	offset, err := client.Offset("asd", 1)
+	offset, err = client.Offset("asd", 1)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, int64(123), offset)
 
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerLag(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
+	// lag
+	// remove previous
+	err = client.Remove("asd", 1)
 	assert.Equal(t, nil, err)
 
 	// non-existing
@@ -249,16 +171,23 @@ func TestTCPConsumerLag(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, int64(100), lag)
 
-	tcpConsumer.Stop()
-}
+	// custom handler
+	tcpConsumer.RegisterCustomHandler("custom", func(body []byte) (*Response, error) {
+		return NewResponse(true, "", "hello!"), nil
+	})
 
-func TestTCPConsumerAwaitTermination(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
+	response, err := client.CustomRequest("custom", nil)
 	assert.Equal(t, nil, err)
+	var responseValue string
+	err = json.Unmarshal(response, &responseValue)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "hello!", responseValue)
 
+	// unknown key
+	_, err = client.CustomRequest("foobar", nil)
+	assert.Regexp(t, regexp.MustCompile("Unknown request key.*"), err.Error())
+
+	// await termination
 	success := make(chan struct{})
 	go func() {
 		tcpConsumer.AwaitTermination()
@@ -279,7 +208,7 @@ func TestTCPConsumerAwaitTermination(t *testing.T) {
 	}
 }
 
-func TestHttpConsumerJoin(t *testing.T) {
+func TestTCPConsumerJoin(t *testing.T) {
 	consumer := NewMockConsumer()
 
 	tcpConsumer := NewConsumer(addr, consumer)
@@ -314,46 +243,6 @@ func TestHttpConsumerJoin(t *testing.T) {
 	case <-time.After(timeout):
 		t.Fatalf("Join failed to unblock within %s", timeout)
 	}
-
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerCustomHandler(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	tcpConsumer.RegisterCustomHandler("custom", func(body []byte) (*Response, error) {
-		return NewResponse(true, "", "hello!"), nil
-	})
-
-	client, err := NewClient(addr)
-	assert.Equal(t, nil, err)
-
-	response, err := client.CustomRequest("custom", nil)
-	assert.Equal(t, nil, err)
-	var responseValue string
-	err = json.Unmarshal(response, &responseValue)
-	assert.Equal(t, nil, err)
-	assert.Equal(t, "hello!", responseValue)
-
-	tcpConsumer.Stop()
-}
-
-func TestTCPConsumerUnknownKey(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	tcpConsumer := NewConsumer(addr, consumer)
-	err := tcpConsumer.Start()
-	assert.Equal(t, nil, err)
-
-	client, err := NewClient(addr)
-	assert.Equal(t, nil, err)
-
-	_, err = client.CustomRequest("foobar", nil)
-	assert.Regexp(t, regexp.MustCompile("Unknown request key.*"), err.Error())
 
 	tcpConsumer.Stop()
 }
