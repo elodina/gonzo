@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-// PartitionConsumerInterface is an interface responsible for consuming exactly one topic/partition
+// PartitionConsumer is an interface responsible for consuming exactly one topic/partition
 // from Kafka. Used to switch between PartitionConsumer in live mode and MockPartitionConsumer in tests.
 type PartitionConsumer interface {
 	// Start starts consuming given topic/partition.
@@ -45,7 +45,7 @@ type PartitionConsumer interface {
 	Lag() int64
 }
 
-// PartitionConsumer serves to consume exactly one topic/partition from Kafka.
+// KafkaPartitionConsumer serves to consume exactly one topic/partition from Kafka.
 // This is very similar to JVM SimpleConsumer except the PartitionConsumer is able to handle
 // leader changes and supports committing offsets to Kafka via Siesta client.
 type KafkaPartitionConsumer struct {
