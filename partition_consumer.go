@@ -76,18 +76,22 @@ func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, p
 // Start starts consuming a single partition from Kafka.
 // This call blocks until Stop() is called.
 func (pc *KafkaPartitionConsumer) Start() {
+	Logger.Info("Starting partition consumer for topic %s, partition %d", pc.topic, pc.partition)
 	proceed := pc.initOffset()
 	if !proceed {
 		return
 	}
 
 	for {
-		response, err := pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
 		select {
 		case <-pc.stop:
-			return
+			{
+				Logger.Info("Stopping fetcher loop for topic %s, partition %d", pc.topic, pc.partition)
+				return
+			}
 		default:
 			{
+				response, err := pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
 				if err != nil {
 					Logger.Warn("Fetch error: %s", err)
 					pc.strategy(&FetchData{
@@ -113,7 +117,7 @@ func (pc *KafkaPartitionConsumer) Start() {
 				// than appending to a slice if it resizes internally, should benchmark this
 				var messages []*MessageAndMetadata
 				collector := pc.collectorFunc(&messages)
-				err := response.CollectMessages(collector)
+				err = response.CollectMessages(collector)
 
 				pc.strategy(&FetchData{
 					Messages: messages,
@@ -125,7 +129,9 @@ func (pc *KafkaPartitionConsumer) Start() {
 }
 
 // Stop stops consuming partition from Kafka.
+// This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 func (pc *KafkaPartitionConsumer) Stop() {
+	Logger.Info("Stopping partition consumer for topic %s, partition %d", pc.topic, pc.partition)
 	pc.stop <- struct{}{}
 }
 

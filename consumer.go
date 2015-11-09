@@ -29,7 +29,8 @@ type Consumer interface {
 	// Returns an error if PartitionConsumer for this topic/partition already exists.
 	Add(topic string, partition int32) error
 
-	// Remove stops consuming a topic/partition by this consumer immediately.
+	// Remove stops consuming a topic/partition by this consumer once it is done with the current batch.
+	// This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 	// Returns an error if PartitionConsumer for this topic/partition does not exist.
 	Remove(topic string, partition int32) error
 
@@ -116,7 +117,8 @@ func (c *KafkaConsumer) Add(topic string, partition int32) error {
 	return nil
 }
 
-// Remove stops consuming a topic/partition by this consumer immediately.
+// Remove stops consuming a topic/partition by this consumer once it is done with the current batch.
+// This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 // Returns an error if PartitionConsumer for this topic/partition does not exist.
 func (c *KafkaConsumer) Remove(topic string, partition int32) error {
 	c.partitionConsumersLock.Lock()

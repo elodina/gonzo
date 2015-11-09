@@ -58,7 +58,8 @@ func (c *Client) Add(topic string, partition int32) error {
 	return c.handleRequest(request, nil)
 }
 
-// Remove stops consuming a topic/partition by associated consumer immediately.
+// Remove stops consuming a topic/partition by associated consumer once it is done with the current batch.
+// This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 // Returns an error if PartitionConsumer for this topic/partition does not exist.
 func (c *Client) Remove(topic string, partition int32) error {
 	request := &clientRequest{
