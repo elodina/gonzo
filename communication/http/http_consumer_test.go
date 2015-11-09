@@ -27,18 +27,6 @@ import (
 	"time"
 )
 
-func TestHttpConsumerStart(t *testing.T) {
-	consumer := NewMockConsumer()
-
-	httpConsumer := NewHttpConsumer("0.0.0.0:61721", consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
-
-	httpConsumer.Stop()
-}
-
 func TestHttpConsumerStartBadCases(t *testing.T) {
 	consumer := NewMockConsumer()
 
@@ -55,8 +43,9 @@ func TestHttpConsumerStartBadCases(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile("listen tcp.*"), err.Error())
 }
 
-func TestHttpConsumerAdd(t *testing.T) {
-	addr := "0.0.0.0:61781"
+func TestHttpConsumer(t *testing.T) {
+	addr := "0.0.0.0:61721"
+
 	consumer := NewMockConsumer()
 	httpConsumer := NewHttpConsumer(addr, consumer)
 	go func() {
@@ -64,6 +53,18 @@ func TestHttpConsumerAdd(t *testing.T) {
 		assert.Equal(t, nil, err)
 	}()
 
+	testHttpConsumerAdd(t, addr)
+	testHttpConsumerRemove(t, addr)
+	testHttpConsumerAssignments(t, addr)
+	testHttpConsumerCommit(t, addr, consumer)
+	testHttpConsumerGetOffset(t, addr)
+	testHttpConsumerSetOffset(t, addr)
+	testHttpConsumerLag(t, addr)
+	testHttpConsumerCustomHandler(t, addr, httpConsumer)
+	testHttpConsumerAwaitTermination(t, httpConsumer)
+}
+
+func testHttpConsumerAdd(t *testing.T, addr string) {
 	// good case
 	_, err := http.Get(fmt.Sprintf("http://%s/add?topic=asd&partition=1", addr))
 	assert.Equal(t, nil, err)
@@ -93,21 +94,9 @@ func TestHttpConsumerAdd(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(".*strconv.ParseInt.*"), response.Message) // strconv.ParseInt error message
 }
 
-func TestHttpConsumerRemove(t *testing.T) {
-	addr := "0.0.0.0:61782"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
-
-	// add first
-	_, err := http.Get(fmt.Sprintf("http://%s/add?topic=asd&partition=1", addr))
-	assert.Equal(t, nil, err)
-
+func testHttpConsumerRemove(t *testing.T, addr string) {
 	// good case
-	_, err = http.Get(fmt.Sprintf("http://%s/remove?topic=asd&partition=1", addr))
+	_, err := http.Get(fmt.Sprintf("http://%s/remove?topic=asd&partition=1", addr))
 	assert.Equal(t, nil, err)
 
 	// remove non-existing
@@ -135,15 +124,7 @@ func TestHttpConsumerRemove(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(".*strconv.ParseInt.*"), response.Message) // strconv.ParseInt error message
 }
 
-func TestHttpConsumerAssignments(t *testing.T) {
-	addr := "0.0.0.0:61783"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
-
+func testHttpConsumerAssignments(t *testing.T, addr string) {
 	// empty assignments
 	rawResponse, err := http.Get(fmt.Sprintf("http://%s/assignments", addr))
 	assert.Equal(t, nil, err)
@@ -176,15 +157,7 @@ func TestHttpConsumerAssignments(t *testing.T) {
 	assert.Len(t, response.Data.(map[string][]int32), 0)
 }
 
-func TestHttpConsumerCommit(t *testing.T) {
-	addr := "0.0.0.0:61784"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
-
+func testHttpConsumerCommit(t *testing.T, addr string, consumer *MockConsumer) {
 	// commit something
 	rawResponse, err := http.Get(fmt.Sprintf("http://%s/commit?topic=asd&partition=1&offset=123", addr))
 	assert.Equal(t, nil, err)
@@ -215,16 +188,13 @@ func TestHttpConsumerCommit(t *testing.T) {
 	assert.Equal(t, nil, err)
 	response, err = ReadHttpResponse(rawResponse, nil)
 	assert.Regexp(t, regexp.MustCompile(".*boom.*"), response.Message)
+	consumer.commitOffsetError = nil
 }
 
-func TestHttpConsumerOffset(t *testing.T) {
-	addr := "0.0.0.0:61785"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
+func testHttpConsumerGetOffset(t *testing.T, addr string) {
+	// remove previous
+	_, err := http.Get(fmt.Sprintf("http://%s/remove?topic=asd&partition=1", addr))
+	assert.Equal(t, nil, err)
 
 	// non-existing
 	rawResponse, err := http.Get(fmt.Sprintf("http://%s/offset?topic=asd&partition=1", addr))
@@ -242,7 +212,7 @@ func TestHttpConsumerOffset(t *testing.T) {
 	offset := int64(-1)
 	response, err = ReadHttpResponse(rawResponse, &offset)
 	assert.Equal(t, nil, err)
-	assert.Equal(t, int64(0), response.Data.(int64))
+	assert.Equal(t, int64(123), response.Data.(int64))
 
 	// commit offset
 	_, err = http.Get(fmt.Sprintf("http://%s/commit?topic=asd&partition=1&offset=234", addr))
@@ -269,14 +239,10 @@ func TestHttpConsumerOffset(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(".*'partition' is not present.*"), response.Message)
 }
 
-func TestHttpConsumerSetOffset(t *testing.T) {
-	addr := "0.0.0.0:61786"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
+func testHttpConsumerSetOffset(t *testing.T, addr string) {
+	// remove previous
+	_, err := http.Get(fmt.Sprintf("http://%s/remove?topic=asd&partition=1", addr))
+	assert.Equal(t, nil, err)
 
 	// non-existing
 	rawResponse, err := http.Get(fmt.Sprintf("http://%s/setoffset?topic=asd&partition=1&offset=123", addr))
@@ -322,14 +288,10 @@ func TestHttpConsumerSetOffset(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(".*'offset' is not present.*"), response.Message)
 }
 
-func TestHttpConsumerLag(t *testing.T) {
-	addr := "0.0.0.0:61787"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
+func testHttpConsumerLag(t *testing.T, addr string) {
+	// remove previous
+	_, err := http.Get(fmt.Sprintf("http://%s/remove?topic=asd&partition=1", addr))
+	assert.Equal(t, nil, err)
 
 	// non-existing
 	rawResponse, err := http.Get(fmt.Sprintf("http://%s/lag?topic=asd&partition=1", addr))
@@ -363,16 +325,26 @@ func TestHttpConsumerLag(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(".*'partition' is not present.*"), response.Message)
 }
 
-func TestHttpConsumerAwaitTermination(t *testing.T) {
-	timeout := time.Second
-	addr := "0.0.0.0:61788"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
+func testHttpConsumerCustomHandler(t *testing.T, addr string, httpConsumer *HttpConsumer) {
+	httpConsumer.RegisterCustomHandler("/custom", func(w http.ResponseWriter, r *http.Request, _ gonzo.Consumer) {
+		w.WriteHeader(http.StatusOK)
+		js, err := json.Marshal("custom!")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write(js)
+	})
 
+	rawResponse, err := http.Get(fmt.Sprintf("http://%s/custom", addr))
+	assert.Equal(t, nil, err)
+	stringResponse := ""
+	response, err := ReadHttpResponse(rawResponse, &stringResponse)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "custom!", response.Data)
+}
+
+func testHttpConsumerAwaitTermination(t *testing.T, httpConsumer *HttpConsumer) {
+	timeout := time.Second
 	success := make(chan struct{})
 	go func() {
 		httpConsumer.AwaitTermination()
@@ -391,10 +363,6 @@ func TestHttpConsumerAwaitTermination(t *testing.T) {
 	case <-time.After(timeout):
 		t.Fatalf("Await termination failed to unblock within %s", timeout)
 	}
-
-	// add first
-	_, err := http.Get(fmt.Sprintf("http://%s/add?topic=asd&partition=1", addr))
-	assert.Equal(t, nil, err)
 }
 
 func TestHttpConsumerJoin(t *testing.T) {
@@ -432,30 +400,4 @@ func TestHttpConsumerJoin(t *testing.T) {
 	case <-time.After(timeout):
 		t.Fatalf("Join failed to unblock within %s", timeout)
 	}
-}
-
-func TestHttpConsumerCustomHandler(t *testing.T) {
-	addr := "0.0.0.0:61790"
-	consumer := NewMockConsumer()
-	httpConsumer := NewHttpConsumer(addr, consumer)
-	httpConsumer.RegisterCustomHandler("/custom", func(w http.ResponseWriter, r *http.Request, _ gonzo.Consumer) {
-		w.WriteHeader(http.StatusOK)
-		js, err := json.Marshal("custom!")
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.Write(js)
-	})
-
-	go func() {
-		err := httpConsumer.Start()
-		assert.Equal(t, nil, err)
-	}()
-
-	rawResponse, err := http.Get(fmt.Sprintf("http://%s/custom", addr))
-	assert.Equal(t, nil, err)
-	stringResponse := ""
-	response, err := ReadHttpResponse(rawResponse, &stringResponse)
-	assert.Equal(t, nil, err)
-	assert.Equal(t, "custom!", response.Data)
 }
