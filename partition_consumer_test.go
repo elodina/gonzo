@@ -352,12 +352,34 @@ func TestPartitionConsumerCommit(t *testing.T) {
 	consumer := NewPartitionConsumer(client, config, topic, partition, strategy)
 	client.initOffsets(config.Group, topic, partition)
 	assert.Equal(t, int64(0), client.offsets[config.Group][topic][partition])
-	//	assertFatal(t, client.offsets[config.Group][topic][partition], int64(0))
 
 	consumer.Start()
 	assert.Equal(t, hwOffset-1, client.offsets[config.Group][topic][partition])
-	//	assertFatal(t, client.offsets[config.Group][topic][partition], hwOffset-1)
 
 	assert.Equal(t, 1, client.commitCount[config.Group][topic][partition])
-	//	assertFatal(t, client.commitCount[config.Group][topic][partition], 1)
+}
+
+func TestPartitionConsumerAutoCommit(t *testing.T) {
+	config := NewConsumerConfig()
+	config.AutoCommitEnable = true
+	topic := "test"
+	partition := int32(0)
+	startOffset := 134
+	hwOffset := int64(startOffset + 100)
+
+	strategy := func(data *FetchData, consumer *KafkaPartitionConsumer) {
+		assert.Equal(t, nil, data.Error)
+
+		consumer.Stop()
+	}
+
+	client := NewMockClient(int64(startOffset), hwOffset)
+	consumer := NewPartitionConsumer(client, config, topic, partition, strategy)
+	client.initOffsets(config.Group, topic, partition)
+	assert.Equal(t, int64(0), client.offsets[config.Group][topic][partition])
+
+	consumer.Start()
+	assert.Equal(t, hwOffset-1, client.offsets[config.Group][topic][partition])
+
+	assert.Equal(t, 1, client.commitCount[config.Group][topic][partition])
 }

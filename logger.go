@@ -18,7 +18,7 @@ package gonzo
 import (
 	"fmt"
 
-	log "github.com/cihub/seelog"
+	log "gopkg.in/cihub/seelog.v2"
 	"runtime"
 	"strings"
 )

@@ -119,6 +119,14 @@ func (pc *KafkaPartitionConsumer) Start() {
 					Messages: messages,
 					Error:    err,
 				}, pc)
+
+				if pc.config.AutoCommitEnable && len(messages) > 0 {
+					offset := messages[len(messages)-1].Offset
+					err = pc.Commit(offset)
+					if err != nil {
+						Logger.Warn("Could not commit offset %d for topic %s, partition %d", offset, pc.topic, pc.partition)
+					}
+				}
 			}
 		}
 	}

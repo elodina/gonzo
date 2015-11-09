@@ -33,6 +33,10 @@ type ConsumerConfig struct {
 	// siesta.LatestTime - automatically reset the offset to the largest offset.
 	// Defaults to siesta.EarliestTime.
 	AutoOffsetReset int64
+
+	// AutoCommitEnable determines whether the consumer will automatically commit offsets after each batch
+	// is finished (e.g. the call to strategy function returns). Turned off by default.
+	AutoCommitEnable bool
 }
 
 // NewConsumerConfig creates a consumer config with sane defaults.

@@ -15,10 +15,7 @@ limitations under the License. */
 
 package gonzo
 
-import (
-	"fmt"
-	"sync"
-)
+import "sync"
 
 type Consumer interface {
 	// Add adds a topic/partition to consume for this consumer and starts consuming it immediately.
@@ -105,7 +102,7 @@ func (c *KafkaConsumer) Add(topic string, partition int32) error {
 
 	if _, exists := c.partitionConsumers[topic][partition]; exists {
 		Logger.Info("Partition consumer for topic %s, partition %d already exists", topic, partition)
-		return fmt.Errorf("Partition consumer for topic %s, partition %d already exists", topic, partition)
+		return ErrPartitionConsumerAlreadyExists
 	}
 
 	c.partitionConsumers[topic][partition] = c.partitionConsumerFactory(c.client, c.config, topic, partition, c.strategy)
@@ -122,7 +119,7 @@ func (c *KafkaConsumer) Remove(topic string, partition int32) error {
 
 	if !c.exists(topic, partition) {
 		Logger.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
-		return fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		return ErrPartitionConsumerDoesNotExist
 	}
 
 	c.partitionConsumers[topic][partition].Stop()
@@ -156,7 +153,7 @@ func (c *KafkaConsumer) Offset(topic string, partition int32) (int64, error) {
 
 	if !c.exists(topic, partition) {
 		Logger.Info("Can't get offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
-		return -1, fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		return -1, ErrPartitionConsumerDoesNotExist
 	}
 
 	return c.partitionConsumers[topic][partition].Offset(), nil
@@ -177,7 +174,7 @@ func (c *KafkaConsumer) SetOffset(topic string, partition int32, offset int64) e
 
 	if !c.exists(topic, partition) {
 		Logger.Info("Can't set offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
-		return fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		return ErrPartitionConsumerDoesNotExist
 	}
 
 	c.partitionConsumers[topic][partition].SetOffset(offset)
@@ -194,7 +191,7 @@ func (c *KafkaConsumer) Lag(topic string, partition int32) (int64, error) {
 
 	if !c.exists(topic, partition) {
 		Logger.Info("Can't get lag as partition consumer for topic %s, partition %d does not exist", topic, partition)
-		return -1, fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		return -1, ErrPartitionConsumerDoesNotExist
 	}
 
 	return c.partitionConsumers[topic][partition].Lag(), nil
