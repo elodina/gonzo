@@ -17,16 +17,21 @@ package gonzo
 
 import "sync"
 
+// Consumer is essentially a collection of PartitionConsumers and exposes nearly the same API
+// but on a bit higher level.
+// Consumer is something similar to JVM High Level Consumer except the load balancing functionality
+// is not implemented here thus allowing the Consumer to be independent from Zookeeper.
 type Consumer interface {
 	// Add adds a topic/partition to consume for this consumer and starts consuming it immediately.
 	// Returns an error if PartitionConsumer for this topic/partition already exists.
 	Add(topic string, partition int32) error
 
-	// Remove stops consuming a topic/partition by this consumer immediately.
+	// Remove stops consuming a topic/partition by this consumer once it is done with the current batch.
+	// This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 	// Returns an error if PartitionConsumer for this topic/partition does not exist.
 	Remove(topic string, partition int32) error
 
-	// Assignment returns a map of topic/partitions being consumer at the moment by this consumer.
+	// Assignment returns a map of topic/partitions being consumed at the moment by this consumer.
 	// The keys are topic names and values are slices of partitions.
 	Assignment() map[string][]int32
 
@@ -60,10 +65,8 @@ type Consumer interface {
 	Join()
 }
 
-// Consumer is essentially a collection of PartitionConsumers and exposes nearly the same API
-// but on a bit higher level.
-// Consumer is something similar to JVM High Level Consumer except the load balancing functionality
-// is not implemented here thus allowing the Consumer to be independent from Zookeeper.
+// KafkaConsumer implements Consumer and is something similar to JVM High Level Consumer except the load
+// balancing functionality is not implemented here thus allowing to be independent from Zookeeper.
 type KafkaConsumer struct {
 	config                 *ConsumerConfig
 	client                 Client
@@ -111,7 +114,8 @@ func (c *KafkaConsumer) Add(topic string, partition int32) error {
 	return nil
 }
 
-// Remove stops consuming a topic/partition by this consumer immediately.
+// Remove stops consuming a topic/partition by this consumer once it is done with the current batch.
+// This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 // Returns an error if PartitionConsumer for this topic/partition does not exist.
 func (c *KafkaConsumer) Remove(topic string, partition int32) error {
 	c.partitionConsumersLock.Lock()
