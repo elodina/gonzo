@@ -15,7 +15,10 @@ limitations under the License. */
 
 package gonzo
 
-import "github.com/stealthly/siesta"
+import (
+	"github.com/elodina/siesta"
+	"time"
+)
 
 // ConsumerConfig provides configuration options for both Consumer and PartitionConsumer.
 type ConsumerConfig struct {
@@ -37,14 +40,22 @@ type ConsumerConfig struct {
 	// AutoCommitEnable determines whether the consumer will automatically commit offsets after each batch
 	// is finished (e.g. the call to strategy function returns). Turned off by default.
 	AutoCommitEnable bool
+
+	// EnableMetrics determines whether the consumer will collect all kinds of metrics to better understand what's
+	// going on under the hood. Turned off by default as it may significantly affect performance.
+	EnableMetrics bool
+
+	// Backoff between attempts to initialize consumer offset.
+	InitOffsetBackoff time.Duration
 }
 
 // NewConsumerConfig creates a consumer config with sane defaults.
 func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
-		Group:           "gonzo-group",
-		KeyDecoder:      new(ByteDecoder),
-		ValueDecoder:    new(ByteDecoder),
-		AutoOffsetReset: siesta.EarliestTime,
+		Group:             "gonzo-group",
+		KeyDecoder:        new(ByteDecoder),
+		ValueDecoder:      new(ByteDecoder),
+		AutoOffsetReset:   siesta.EarliestTime,
+		InitOffsetBackoff: 500 * time.Millisecond,
 	}
 }

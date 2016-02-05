@@ -16,7 +16,8 @@ limitations under the License. */
 package gonzo
 
 import (
-	"github.com/stealthly/siesta"
+	"github.com/elodina/siesta"
+	"github.com/rcrowley/go-metrics"
 	"sync/atomic"
 	"time"
 )
@@ -43,6 +44,9 @@ type PartitionConsumer interface {
 	// Lag returns the difference between the latest available offset in the partition and the
 	// latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 	Lag() int64
+
+	// Metrics returns a metrics registry for this partition consumer. An error is returned if metrics are disabled.
+	Metrics() (metrics.Registry, error)
 }
 
 // KafkaPartitionConsumer serves to consume exactly one topic/partition from Kafka.
@@ -56,6 +60,7 @@ type KafkaPartitionConsumer struct {
 	offset              int64
 	highwaterMarkOffset int64
 	strategy            Strategy
+	metrics             PartitionConsumerMetrics
 	stop                chan struct{}
 }
 
@@ -63,12 +68,18 @@ type KafkaPartitionConsumer struct {
 // consume given topic and partition.
 // The message processing logic is passed via strategy.
 func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, partition int32, strategy Strategy) PartitionConsumer {
+	var metrics PartitionConsumerMetrics = noOpPartitionConsumerMetrics
+	if config.EnableMetrics {
+		metrics = NewKafkaPartitionConsumerMetrics(topic, partition)
+	}
+
 	return &KafkaPartitionConsumer{
 		client:    client,
 		config:    config,
 		topic:     topic,
 		partition: partition,
 		strategy:  strategy,
+		metrics:   metrics,
 		stop:      make(chan struct{}, 1),
 	}
 }
@@ -92,8 +103,14 @@ func (pc *KafkaPartitionConsumer) Start() {
 		default:
 			{
 				response, err := pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
+				pc.metrics.NumFetches(func(numFetches metrics.Counter) {
+					numFetches.Inc(1)
+				})
 				if err != nil {
 					Logger.Warn("Fetch error: %s", err)
+					pc.metrics.NumFailedFetches(func(numFailedFetches metrics.Counter) {
+						numFailedFetches.Inc(1)
+					})
 					pc.strategy(&FetchData{
 						Messages: nil,
 						Error:    err,
@@ -103,7 +120,14 @@ func (pc *KafkaPartitionConsumer) Start() {
 
 				data := response.Data[pc.topic][pc.partition]
 				atomic.StoreInt64(&pc.highwaterMarkOffset, data.HighwaterMarkOffset)
+				pc.metrics.Lag(func(lag metrics.Gauge) {
+					lag.Update(pc.Lag())
+				})
+
 				if len(data.Messages) == 0 {
+					pc.metrics.NumEmptyFetches(func(numEmptyFetches metrics.Counter) {
+						numEmptyFetches.Inc(1)
+					})
 					continue
 				}
 
@@ -118,6 +142,15 @@ func (pc *KafkaPartitionConsumer) Start() {
 				var messages []*MessageAndMetadata
 				collector := pc.collectorFunc(&messages)
 				err = response.CollectMessages(collector)
+				if err != nil {
+					pc.metrics.NumFailedFetches(func(numFetches metrics.Counter) {
+						numFetches.Inc(1)
+					})
+				}
+
+				pc.metrics.NumFetchedMessages(func(numFetchedMessages metrics.Counter) {
+					numFetchedMessages.Inc(int64(len(data.Messages)))
+				})
 
 				pc.strategy(&FetchData{
 					Messages: messages,
@@ -141,11 +174,22 @@ func (pc *KafkaPartitionConsumer) Start() {
 func (pc *KafkaPartitionConsumer) Stop() {
 	Logger.Info("Stopping partition consumer for topic %s, partition %d", pc.topic, pc.partition)
 	pc.stop <- struct{}{}
+	pc.metrics.Stop()
 }
 
 // Commit commits the given offset to Kafka. Returns an error on unsuccessful commit.
 func (pc *KafkaPartitionConsumer) Commit(offset int64) error {
-	return pc.client.CommitOffset(pc.config.Group, pc.topic, pc.partition, offset)
+	pc.metrics.NumOffsetCommits(func(numOffsetCommits metrics.Counter) {
+		numOffsetCommits.Inc(1)
+	})
+	err := pc.client.CommitOffset(pc.config.Group, pc.topic, pc.partition, offset)
+	if err != nil {
+		pc.metrics.NumFailedOffsetCommits(func(numFetchedMessages metrics.Counter) {
+			numFetchedMessages.Inc(1)
+		})
+	}
+
+	return err
 }
 
 // SetOffset overrides the current fetch offset value for given topic/partition.
@@ -163,6 +207,15 @@ func (pc *KafkaPartitionConsumer) Offset() int64 {
 // latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 func (pc *KafkaPartitionConsumer) Lag() int64 {
 	return atomic.LoadInt64(&pc.highwaterMarkOffset) - atomic.LoadInt64(&pc.offset)
+}
+
+// Metrics returns a metrics registry for this partition consumer. An error is returned if metrics are disabled.
+func (pc *KafkaPartitionConsumer) Metrics() (metrics.Registry, error) {
+	if !pc.config.EnableMetrics {
+		return nil, ErrMetricsDisabled
+	}
+
+	return pc.metrics.Registry(), nil
 }
 
 func (pc *KafkaPartitionConsumer) initOffset() bool {
@@ -186,7 +239,7 @@ func (pc *KafkaPartitionConsumer) initOffset() bool {
 			atomic.StoreInt64(&pc.highwaterMarkOffset, offset)
 			return true
 		}
-		time.Sleep(1 * time.Second) // TODO configurable
+		time.Sleep(pc.config.InitOffsetBackoff)
 	}
 }
 
@@ -208,7 +261,7 @@ func (pc *KafkaPartitionConsumer) resetOffset() bool {
 			atomic.StoreInt64(&pc.highwaterMarkOffset, offset)
 			return true
 		}
-		time.Sleep(1 * time.Second) // TODO configurable
+		time.Sleep(pc.config.InitOffsetBackoff)
 	}
 }
 

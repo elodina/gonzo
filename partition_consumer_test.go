@@ -17,7 +17,8 @@ package gonzo
 
 import (
 	"fmt"
-	"github.com/stealthly/siesta"
+	"github.com/elodina/siesta"
+	"github.com/rcrowley/go-metrics"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 	"time"
@@ -60,6 +61,11 @@ func (mpc *MockPartitionConsumer) Lag() int64 {
 	return mpc.lag
 }
 
+func (mpc *MockPartitionConsumer) Metrics() (metrics.Registry, error) {
+	Logger.Info("MockPartitionConsumer.Metrics()")
+	return nil, nil
+}
+
 func TestPartitionConsumerSingleFetch(t *testing.T) {
 	topic := "test"
 	partition := int32(0)
@@ -79,7 +85,7 @@ func TestPartitionConsumerSingleFetch(t *testing.T) {
 	}
 
 	client := NewMockClient(0, 100)
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -107,7 +113,7 @@ func TestPartitionConsumerMultipleFetchesFromStart(t *testing.T) {
 	}
 
 	client := NewMockClient(0, int64(expectedMessages))
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -136,7 +142,7 @@ func TestPartitionConsumerMultipleFetches(t *testing.T) {
 	}
 
 	client := NewMockClient(int64(startOffset), int64(startOffset+expectedMessages))
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -165,7 +171,7 @@ func TestPartitionConsumerEmptyFetch(t *testing.T) {
 
 	client := NewMockClient(0, int64(expectedMessages))
 	client.emptyFetches = 2
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -180,7 +186,7 @@ func TestPartitionConsumerFetchError(t *testing.T) {
 	client := NewMockClient(0, 200)
 	client.fetchError = siesta.ErrEOF
 	client.fetchErrorTimes = 1
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), "test", 0, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), "test", 0, strategy)
 
 	consumer.Start()
 }
@@ -207,7 +213,7 @@ func TestPartitionConsumerFetchResponseError(t *testing.T) {
 
 	client := NewMockClient(0, int64(expectedMessages))
 	client.fetchError = siesta.ErrUnknownTopicOrPartition
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -237,7 +243,7 @@ func TestPartitionConsumerGetOffsetErrors(t *testing.T) {
 	client.getOffsetErrorTimes = 2
 	client.getAvailableOffsetError = siesta.ErrEOF
 	client.getAvailableOffsetErrorTimes = 2
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -256,7 +262,7 @@ func TestPartitionConsumerStopOnInitOffset(t *testing.T) {
 	client.getOffsetErrorTimes = 3
 	client.getAvailableOffsetError = siesta.ErrEOF
 	client.getAvailableOffsetErrorTimes = 3
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -279,7 +285,7 @@ func TestPartitionConsumerStopOnOffsetReset(t *testing.T) {
 	client.getOffsetErrorTimes = 3
 	client.getAvailableOffsetError = siesta.ErrEOF
 	client.getAvailableOffsetErrorTimes = 3
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -303,7 +309,7 @@ func TestPartitionConsumerOffsetAndLag(t *testing.T) {
 	}
 
 	client := NewMockClient(int64(startOffset), int64(highwaterMarkOffset))
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
@@ -329,13 +335,13 @@ func TestPartitionConsumerSetOffset(t *testing.T) {
 	}
 
 	client := NewMockClient(int64(startOffset), int64(startOffset+100))
-	consumer := NewPartitionConsumer(client, NewConsumerConfig(), topic, partition, strategy)
+	consumer := NewPartitionConsumer(client, testConsumerConfig(), topic, partition, strategy)
 
 	consumer.Start()
 }
 
 func TestPartitionConsumerCommit(t *testing.T) {
-	config := NewConsumerConfig()
+	config := testConsumerConfig()
 	topic := "test"
 	partition := int32(0)
 	startOffset := 134
@@ -360,7 +366,7 @@ func TestPartitionConsumerCommit(t *testing.T) {
 }
 
 func TestPartitionConsumerAutoCommit(t *testing.T) {
-	config := NewConsumerConfig()
+	config := testConsumerConfig()
 	config.AutoCommitEnable = true
 	topic := "test"
 	partition := int32(0)
@@ -382,4 +388,10 @@ func TestPartitionConsumerAutoCommit(t *testing.T) {
 	assert.Equal(t, hwOffset-1, client.offsets[config.Group][topic][partition])
 
 	assert.Equal(t, 1, client.commitCount[config.Group][topic][partition])
+}
+
+func testConsumerConfig() *ConsumerConfig {
+	config := NewConsumerConfig()
+	config.EnableMetrics = true
+	return config
 }

@@ -15,7 +15,10 @@ limitations under the License. */
 
 package gonzo
 
-import "sync"
+import (
+	"github.com/rcrowley/go-metrics"
+	"sync"
+)
 
 // Consumer is essentially a collection of PartitionConsumers and exposes nearly the same API
 // but on a bit higher level.
@@ -61,6 +64,17 @@ type Consumer interface {
 	// AwaitTermination blocks until Stop() is called.
 	AwaitTermination()
 
+	// ConsumerMetrics returns a metrics registry for this consumer. An error is returned if metrics are disabled.
+	ConsumerMetrics() (metrics.Registry, error)
+
+	// PartitionConsumerMetrics returns a metrics registry for a given topic and partition. An error is returned
+	// if metrics are disabled or PartitionConsumer for given topic and partition does not exist
+	PartitionConsumerMetrics(topic string, partition int32) (metrics.Registry, error)
+
+	// AllMetrics returns metrics registries for this consumer and all its PartitionConsumers. An error is returned
+	// if metrics are disabled.
+	AllMetrics() (*Metrics, error)
+
 	// Join blocks until consumer has at least one topic/partition to consume, e.g. until len(Assignment()) > 0.
 	Join()
 }
@@ -71,6 +85,7 @@ type KafkaConsumer struct {
 	config                 *ConsumerConfig
 	client                 Client
 	strategy               Strategy
+	metrics                ConsumerMetrics
 	partitionConsumers     map[string]map[int32]PartitionConsumer
 	partitionConsumersLock sync.Mutex
 	assignmentsWaitGroup   sync.WaitGroup
@@ -83,10 +98,16 @@ type KafkaConsumer struct {
 // NewConsumer creates a new Consumer using the given client and config.
 // The message processing logic is passed via strategy.
 func NewConsumer(client Client, config *ConsumerConfig, strategy Strategy) Consumer {
+	var metrics ConsumerMetrics = noOpConsumerMetrics
+	if config.EnableMetrics {
+		metrics = NewKafkaConsumerMetrics(config.Group)
+	}
+
 	return &KafkaConsumer{
 		config:                   config,
 		client:                   client,
 		strategy:                 strategy,
+		metrics:                  metrics,
 		partitionConsumers:       make(map[string]map[int32]PartitionConsumer),
 		partitionConsumerFactory: NewPartitionConsumer,
 		stopped:                  make(chan struct{}),
@@ -108,6 +129,10 @@ func (c *KafkaConsumer) Add(topic string, partition int32) error {
 		return ErrPartitionConsumerAlreadyExists
 	}
 
+	c.metrics.NumOwnedTopicPartitions(func(numOwnedTopicPartitions metrics.Counter) {
+		numOwnedTopicPartitions.Inc(1)
+	})
+
 	c.partitionConsumers[topic][partition] = c.partitionConsumerFactory(c.client, c.config, topic, partition, c.strategy)
 	c.assignmentsWaitGroup.Add(1)
 	go c.partitionConsumers[topic][partition].Start()
@@ -125,6 +150,10 @@ func (c *KafkaConsumer) Remove(topic string, partition int32) error {
 		Logger.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return ErrPartitionConsumerDoesNotExist
 	}
+
+	c.metrics.NumOwnedTopicPartitions(func(numOwnedTopicPartitions metrics.Counter) {
+		numOwnedTopicPartitions.Dec(1)
+	})
 
 	c.partitionConsumers[topic][partition].Stop()
 	c.assignmentsWaitGroup.Done()
@@ -219,6 +248,66 @@ func (c *KafkaConsumer) AwaitTermination() {
 // Join blocks until consumer has at least one topic/partition to consume, e.g. until len(Assignment()) > 0.
 func (c *KafkaConsumer) Join() {
 	c.assignmentsWaitGroup.Wait()
+}
+
+// ConsumerMetrics returns a metrics registry for this consumer. An error is returned if metrics are disabled.
+func (c *KafkaConsumer) ConsumerMetrics() (metrics.Registry, error) {
+	if !c.config.EnableMetrics {
+		return nil, ErrMetricsDisabled
+	}
+
+	return c.metrics.Registry(), nil
+}
+
+// PartitionConsumerMetrics returns a metrics registry for a given topic and partition. An error is returned
+// if metrics are disabled or PartitionConsumer for given topic and partition does not exist
+func (c *KafkaConsumer) PartitionConsumerMetrics(topic string, partition int32) (metrics.Registry, error) {
+	if !c.config.EnableMetrics {
+		return nil, ErrMetricsDisabled
+	}
+
+	c.partitionConsumersLock.Lock()
+	defer c.partitionConsumersLock.Unlock()
+
+	if !c.exists(topic, partition) {
+		Logger.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		return nil, ErrPartitionConsumerDoesNotExist
+	}
+
+	return c.partitionConsumers[topic][partition].Metrics()
+}
+
+// AllMetrics returns metrics registries for this consumer and all its PartitionConsumers. An error is returned
+// if metrics are disabled.
+func (c *KafkaConsumer) AllMetrics() (*Metrics, error) {
+	if !c.config.EnableMetrics {
+		return nil, ErrMetricsDisabled
+	}
+
+	c.partitionConsumersLock.Lock()
+	defer c.partitionConsumersLock.Unlock()
+
+	partitionConsumerMetrics := make(map[string]map[int32]metrics.Registry)
+	for topic, partitionConsumers := range c.partitionConsumers {
+		partitionConsumerMetrics[topic] = make(map[int32]metrics.Registry)
+		for partition, consumer := range partitionConsumers {
+			metrics, err := consumer.Metrics()
+			if err != nil {
+				return nil, err
+			}
+			partitionConsumerMetrics[topic][partition] = metrics
+		}
+	}
+
+	metrics, err := c.ConsumerMetrics()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Metrics{
+		Consumer:           metrics,
+		PartitionConsumers: partitionConsumerMetrics,
+	}, nil
 }
 
 func (c *KafkaConsumer) exists(topic string, partition int32) bool {

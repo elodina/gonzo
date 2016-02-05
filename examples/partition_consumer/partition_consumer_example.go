@@ -18,7 +18,7 @@ package main
 import (
 	"fmt"
 	"github.com/elodina/gonzo"
-	"github.com/stealthly/siesta"
+	"github.com/elodina/siesta"
 )
 
 func main() {
