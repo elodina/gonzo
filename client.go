@@ -15,7 +15,7 @@ limitations under the License. */
 
 package gonzo
 
-import "github.com/stealthly/siesta"
+import "github.com/elodina/siesta"
 
 // Client is an interface responsible for low-level Kafka interaction.
 // The only supported implmentation now is Siesta.

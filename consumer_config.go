@@ -16,7 +16,7 @@ limitations under the License. */
 package gonzo
 
 import (
-	"github.com/stealthly/siesta"
+	"github.com/elodina/siesta"
 	"time"
 )
 

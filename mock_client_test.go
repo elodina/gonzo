@@ -17,7 +17,7 @@ package gonzo
 
 import (
 	"fmt"
-	"github.com/stealthly/siesta"
+	"github.com/elodina/siesta"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 )

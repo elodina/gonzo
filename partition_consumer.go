@@ -16,8 +16,8 @@ limitations under the License. */
 package gonzo
 
 import (
+	"github.com/elodina/siesta"
 	"github.com/rcrowley/go-metrics"
-	"github.com/stealthly/siesta"
 	"sync/atomic"
 	"time"
 )
@@ -44,6 +44,9 @@ type PartitionConsumer interface {
 	// Lag returns the difference between the latest available offset in the partition and the
 	// latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 	Lag() int64
+
+	// Metrics returns a metrics registry for this partition consumer. An error is returned if metrics are disabled.
+	Metrics() (metrics.Registry, error)
 }
 
 // KafkaPartitionConsumer serves to consume exactly one topic/partition from Kafka.
@@ -179,7 +182,14 @@ func (pc *KafkaPartitionConsumer) Commit(offset int64) error {
 	pc.metrics.NumOffsetCommits(func(numOffsetCommits metrics.Counter) {
 		numOffsetCommits.Inc(1)
 	})
-	return pc.client.CommitOffset(pc.config.Group, pc.topic, pc.partition, offset)
+	err := pc.client.CommitOffset(pc.config.Group, pc.topic, pc.partition, offset)
+	if err != nil {
+		pc.metrics.NumFailedOffsetCommits(func(numFetchedMessages metrics.Counter) {
+			numFetchedMessages.Inc(1)
+		})
+	}
+
+	return err
 }
 
 // SetOffset overrides the current fetch offset value for given topic/partition.
@@ -197,6 +207,15 @@ func (pc *KafkaPartitionConsumer) Offset() int64 {
 // latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 func (pc *KafkaPartitionConsumer) Lag() int64 {
 	return atomic.LoadInt64(&pc.highwaterMarkOffset) - atomic.LoadInt64(&pc.offset)
+}
+
+// Metrics returns a metrics registry for this partition consumer. An error is returned if metrics are disabled.
+func (pc *KafkaPartitionConsumer) Metrics() (metrics.Registry, error) {
+	if !pc.config.EnableMetrics {
+		return nil, ErrMetricsDisabled
+	}
+
+	return pc.metrics.Registry(), nil
 }
 
 func (pc *KafkaPartitionConsumer) initOffset() bool {
