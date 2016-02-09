@@ -18,7 +18,6 @@ package gonzo
 import (
 	"fmt"
 	"github.com/elodina/siesta"
-	"github.com/rcrowley/go-metrics"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 	"time"
@@ -61,7 +60,7 @@ func (mpc *MockPartitionConsumer) Lag() int64 {
 	return mpc.lag
 }
 
-func (mpc *MockPartitionConsumer) Metrics() (metrics.Registry, error) {
+func (mpc *MockPartitionConsumer) Metrics() (PartitionConsumerMetrics, error) {
 	Logger.Info("MockPartitionConsumer.Metrics()")
 	return nil, nil
 }

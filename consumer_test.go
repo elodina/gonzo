@@ -16,6 +16,7 @@ limitations under the License. */
 package gonzo
 
 import (
+	"github.com/rcrowley/go-metrics"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ var NoOpStrategy = func(data *FetchData, consumer *KafkaPartitionConsumer) {}
 
 func TestConsumerAssignments(t *testing.T) {
 	client := NewMockClient(0, 0)
-	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer := NewConsumer(client, testConsumerConfig(), NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// no assignments
@@ -86,7 +87,7 @@ func TestConsumerAssignments(t *testing.T) {
 
 func TestConsumerOffset(t *testing.T) {
 	client := NewMockClient(0, 0)
-	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer := NewConsumer(client, testConsumerConfig(), NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// offset for non-existing
@@ -122,7 +123,7 @@ func TestConsumerOffset(t *testing.T) {
 
 func TestConsumerCommitOffset(t *testing.T) {
 	client := NewMockClient(0, 0)
-	config := NewConsumerConfig()
+	config := testConsumerConfig()
 	consumer := NewConsumer(client, config, NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
@@ -134,7 +135,7 @@ func TestConsumerCommitOffset(t *testing.T) {
 
 func TestConsumerSetOffset(t *testing.T) {
 	client := NewMockClient(0, 0)
-	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer := NewConsumer(client, testConsumerConfig(), NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// set for non-existing
@@ -165,7 +166,7 @@ func TestConsumerSetOffset(t *testing.T) {
 
 func TestConsumerLag(t *testing.T) {
 	client := NewMockClient(0, 0)
-	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer := NewConsumer(client, testConsumerConfig(), NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	// lag for non-existing
@@ -195,7 +196,7 @@ func TestConsumerLag(t *testing.T) {
 func TestConsumerAwaitTermination(t *testing.T) {
 	timeout := time.Second
 	client := NewMockClient(0, 0)
-	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer := NewConsumer(client, testConsumerConfig(), NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	success := make(chan struct{})
@@ -220,7 +221,7 @@ func TestConsumerJoin(t *testing.T) {
 	partition := int32(0)
 
 	client := NewMockClient(0, 0)
-	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+	consumer := NewConsumer(client, testConsumerConfig(), NoOpStrategy)
 	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
 
 	success := make(chan struct{})
@@ -260,4 +261,75 @@ func TestConsumerJoin(t *testing.T) {
 	case <-time.After(timeout):
 		t.Fatalf("Join failed to unblock within %s", timeout)
 	}
+}
+
+func TestConsumerMetrics(t *testing.T) {
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+
+	m, err := consumer.ConsumerMetrics()
+	assert.Nil(t, m)
+	assert.Equal(t, ErrMetricsDisabled, err)
+
+	consumer = NewConsumer(client, testConsumerConfig(), NoOpStrategy)
+	consumer.(*KafkaConsumer).partitionConsumerFactory = NewMockPartitionConsumer
+	consumer.Add("foo", 0)
+
+	m, err = consumer.ConsumerMetrics()
+	assert.Nil(t, err)
+
+	called := false
+	m.NumOwnedTopicPartitions(func(numOwnedTopicPartitions metrics.Counter) {
+		called = true
+		assert.Equal(t, int64(1), numOwnedTopicPartitions.Count())
+	})
+	assert.True(t, called)
+}
+
+func TestPartitionConsumerMetrics(t *testing.T) {
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+
+	m, err := consumer.PartitionConsumerMetrics("foo", 0)
+	assert.Nil(t, m)
+	assert.Equal(t, ErrMetricsDisabled, err)
+
+	// enable metrics but don't add topic/partition
+	consumer = NewConsumer(client, testConsumerConfig(), NoOpStrategy)
+
+	m, err = consumer.PartitionConsumerMetrics("foo", 0)
+	assert.Nil(t, m)
+	assert.Equal(t, ErrPartitionConsumerDoesNotExist, err)
+
+	// now add
+	consumer.Add("foo", 0)
+
+	m, err = consumer.PartitionConsumerMetrics("foo", 0)
+	assert.Nil(t, err)
+}
+
+func TestAllMetrics(t *testing.T) {
+	client := NewMockClient(0, 0)
+	consumer := NewConsumer(client, NewConsumerConfig(), NoOpStrategy)
+
+	m, err := consumer.AllMetrics()
+	assert.Nil(t, m)
+	assert.Equal(t, ErrMetricsDisabled, err)
+
+	consumer = NewConsumer(client, testConsumerConfig(), NoOpStrategy)
+
+	m, err = consumer.AllMetrics()
+	assert.Nil(t, err)
+	assert.NotNil(t, m.Consumer)
+	assert.NotNil(t, m.PartitionConsumers)
+	assert.Len(t, m.PartitionConsumers, 0)
+
+	consumer.Add("foo", 0)
+
+	m, err = consumer.AllMetrics()
+	assert.Nil(t, err)
+	assert.NotNil(t, m.Consumer)
+	assert.NotNil(t, m.PartitionConsumers)
+	assert.Len(t, m.PartitionConsumers, 1)
+	assert.Len(t, m.PartitionConsumers["foo"], 1)
 }

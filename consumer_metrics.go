@@ -23,11 +23,11 @@ import (
 
 // Metrics is a set of all metrics for one Consumer instance.
 type Metrics struct {
-	// Consumer is a metrics registry for enclosing Consumer instance.
-	Consumer metrics.Registry
+	// Consumer is all metrics for enclosing Consumer instance.
+	Consumer ConsumerMetrics
 
-	// PartitionConsumers is a map of topic/partitions to PartitionConsumer metrics registries.
-	PartitionConsumers map[string]map[int32]metrics.Registry
+	// PartitionConsumers is a map of topic/partitions to PartitionConsumer metrics.
+	PartitionConsumers map[string]map[int32]PartitionConsumerMetrics
 }
 
 // ConsumerMetrics is an interface for accessing and modifying Consumer metrics.

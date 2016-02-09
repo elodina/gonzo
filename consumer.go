@@ -64,12 +64,12 @@ type Consumer interface {
 	// AwaitTermination blocks until Stop() is called.
 	AwaitTermination()
 
-	// ConsumerMetrics returns a metrics registry for this consumer. An error is returned if metrics are disabled.
-	ConsumerMetrics() (metrics.Registry, error)
+	// ConsumerMetrics returns a metrics structure for this consumer. An error is returned if metrics are disabled.
+	ConsumerMetrics() (ConsumerMetrics, error)
 
-	// PartitionConsumerMetrics returns a metrics registry for a given topic and partition. An error is returned
+	// PartitionConsumerMetrics returns a metrics structure for a given topic and partition. An error is returned
 	// if metrics are disabled or PartitionConsumer for given topic and partition does not exist
-	PartitionConsumerMetrics(topic string, partition int32) (metrics.Registry, error)
+	PartitionConsumerMetrics(topic string, partition int32) (PartitionConsumerMetrics, error)
 
 	// AllMetrics returns metrics registries for this consumer and all its PartitionConsumers. An error is returned
 	// if metrics are disabled.
@@ -237,6 +237,7 @@ func (c *KafkaConsumer) Stop() {
 			c.Remove(topic, partition)
 		}
 	}
+	c.metrics.Stop()
 	close(c.stopped)
 }
 
@@ -250,18 +251,18 @@ func (c *KafkaConsumer) Join() {
 	c.assignmentsWaitGroup.Wait()
 }
 
-// ConsumerMetrics returns a metrics registry for this consumer. An error is returned if metrics are disabled.
-func (c *KafkaConsumer) ConsumerMetrics() (metrics.Registry, error) {
+// ConsumerMetrics returns a metrics structure for this consumer. An error is returned if metrics are disabled.
+func (c *KafkaConsumer) ConsumerMetrics() (ConsumerMetrics, error) {
 	if !c.config.EnableMetrics {
 		return nil, ErrMetricsDisabled
 	}
 
-	return c.metrics.Registry(), nil
+	return c.metrics, nil
 }
 
-// PartitionConsumerMetrics returns a metrics registry for a given topic and partition. An error is returned
+// PartitionConsumerMetrics returns a metrics structure for a given topic and partition. An error is returned
 // if metrics are disabled or PartitionConsumer for given topic and partition does not exist
-func (c *KafkaConsumer) PartitionConsumerMetrics(topic string, partition int32) (metrics.Registry, error) {
+func (c *KafkaConsumer) PartitionConsumerMetrics(topic string, partition int32) (PartitionConsumerMetrics, error) {
 	if !c.config.EnableMetrics {
 		return nil, ErrMetricsDisabled
 	}
@@ -287,9 +288,9 @@ func (c *KafkaConsumer) AllMetrics() (*Metrics, error) {
 	c.partitionConsumersLock.Lock()
 	defer c.partitionConsumersLock.Unlock()
 
-	partitionConsumerMetrics := make(map[string]map[int32]metrics.Registry)
+	partitionConsumerMetrics := make(map[string]map[int32]PartitionConsumerMetrics)
 	for topic, partitionConsumers := range c.partitionConsumers {
-		partitionConsumerMetrics[topic] = make(map[int32]metrics.Registry)
+		partitionConsumerMetrics[topic] = make(map[int32]PartitionConsumerMetrics)
 		for partition, consumer := range partitionConsumers {
 			metrics, err := consumer.Metrics()
 			if err != nil {

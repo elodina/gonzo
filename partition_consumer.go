@@ -45,8 +45,8 @@ type PartitionConsumer interface {
 	// latest fetched offset by this consumer. This allows you to see how much behind the consumer is.
 	Lag() int64
 
-	// Metrics returns a metrics registry for this partition consumer. An error is returned if metrics are disabled.
-	Metrics() (metrics.Registry, error)
+	// Metrics returns a metrics structure for this partition consumer. An error is returned if metrics are disabled.
+	Metrics() (PartitionConsumerMetrics, error)
 }
 
 // KafkaPartitionConsumer serves to consume exactly one topic/partition from Kafka.
@@ -102,10 +102,18 @@ func (pc *KafkaPartitionConsumer) Start() {
 			}
 		default:
 			{
-				response, err := pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
+				var response *siesta.FetchResponse
+				var err error
+				pc.metrics.FetchDuration(func(fetchDuration metrics.Timer) {
+					fetchDuration.Time(func() {
+						response, err = pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
+					})
+				})
+
 				pc.metrics.NumFetches(func(numFetches metrics.Counter) {
 					numFetches.Inc(1)
 				})
+
 				if err != nil {
 					Logger.Warn("Fetch error: %s", err)
 					pc.metrics.NumFailedFetches(func(numFailedFetches metrics.Counter) {
@@ -209,13 +217,13 @@ func (pc *KafkaPartitionConsumer) Lag() int64 {
 	return atomic.LoadInt64(&pc.highwaterMarkOffset) - atomic.LoadInt64(&pc.offset)
 }
 
-// Metrics returns a metrics registry for this partition consumer. An error is returned if metrics are disabled.
-func (pc *KafkaPartitionConsumer) Metrics() (metrics.Registry, error) {
+// Metrics returns a metrics structure for this partition consumer. An error is returned if metrics are disabled.
+func (pc *KafkaPartitionConsumer) Metrics() (PartitionConsumerMetrics, error) {
 	if !pc.config.EnableMetrics {
 		return nil, ErrMetricsDisabled
 	}
 
-	return pc.metrics.Registry(), nil
+	return pc.metrics, nil
 }
 
 func (pc *KafkaPartitionConsumer) initOffset() bool {
