@@ -269,13 +269,11 @@ func (pc *KafkaPartitionConsumer) collectorFunc(messages *[]*MessageAndMetadata)
 	return func(topic string, partition int32, offset int64, key []byte, value []byte) error {
 		decodedKey, err := pc.config.KeyDecoder.Decode(key)
 		if err != nil {
-			//TODO siesta should support collector function to return an error
 			Logger.Warn(err.Error())
 			return err
 		}
 		decodedValue, err := pc.config.ValueDecoder.Decode(value)
 		if err != nil {
-			//TODO siesta should support collector function to return an error
 			Logger.Warn(err.Error())
 			return err
 		}
