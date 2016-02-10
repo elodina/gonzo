@@ -22,6 +22,9 @@ import (
 
 // PartitionConsumerMetrics is an interface for accessing and modifying PartitionConsumer metrics.
 type PartitionConsumerMetrics interface {
+	// FetchDuration is a timer that measures time to fetch from Kafka broker by enclosing PartitionConsumer.
+	FetchDuration(func(metrics.Timer))
+
 	// NumFetches is a counter with a total number of fetches done by enclosing PartitionConsumer.
 	NumFetches(func(metrics.Counter))
 
@@ -54,6 +57,7 @@ type PartitionConsumerMetrics interface {
 type KafkaPartitionConsumerMetrics struct {
 	registry metrics.Registry
 
+	fetchDuration          metrics.Timer
 	numFetches             metrics.Counter
 	numFailedFetches       metrics.Counter
 	numEmptyFetches        metrics.Counter
@@ -69,6 +73,7 @@ func NewKafkaPartitionConsumerMetrics(topic string, partition int32) *KafkaParti
 
 	return &KafkaPartitionConsumerMetrics{
 		registry:               registry,
+		fetchDuration:          metrics.NewRegisteredTimer("fetchDuration", registry),
 		numFetches:             metrics.NewRegisteredCounter("numFetches", registry),
 		numFailedFetches:       metrics.NewRegisteredCounter("numFailedFetches", registry),
 		numEmptyFetches:        metrics.NewRegisteredCounter("numEmptyFetches", registry),
@@ -77,6 +82,11 @@ func NewKafkaPartitionConsumerMetrics(topic string, partition int32) *KafkaParti
 		numFailedOffsetCommits: metrics.NewRegisteredCounter("numFailedOffsetCommits", registry),
 		lag: metrics.NewRegisteredGauge("lag", registry),
 	}
+}
+
+// FetchDuration is a timer that measures time to fetch from Kafka broker by enclosing PartitionConsumer.
+func (kpcm *KafkaPartitionConsumerMetrics) FetchDuration(f func(metrics.Timer)) {
+	f(kpcm.fetchDuration)
 }
 
 // NumFetches is a counter with a total number of fetches done by enclosing PartitionConsumer.
@@ -128,6 +138,7 @@ var noOpPartitionConsumerMetrics = new(noOpKafkaPartitionConsumerMetrics)
 
 type noOpKafkaPartitionConsumerMetrics struct{}
 
+func (*noOpKafkaPartitionConsumerMetrics) FetchDuration(f func(metrics.Timer))            {}
 func (*noOpKafkaPartitionConsumerMetrics) NumFetches(f func(metrics.Counter))             {}
 func (*noOpKafkaPartitionConsumerMetrics) NumFailedFetches(f func(metrics.Counter))       {}
 func (*noOpKafkaPartitionConsumerMetrics) NumEmptyFetches(f func(metrics.Counter))        {}

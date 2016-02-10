@@ -16,7 +16,6 @@ package tcp
 import (
 	"fmt"
 	"github.com/elodina/gonzo"
-	"github.com/rcrowley/go-metrics"
 	"sync"
 )
 
@@ -149,11 +148,11 @@ func (mc *MockConsumer) Join() {
 	mc.assignmentsWaitGroup.Wait()
 }
 
-func (mc *MockConsumer) ConsumerMetrics() (metrics.Registry, error) {
+func (mc *MockConsumer) ConsumerMetrics() (gonzo.ConsumerMetrics, error) {
 	return nil, nil
 }
 
-func (mc *MockConsumer) PartitionConsumerMetrics(topic string, partition int32) (metrics.Registry, error) {
+func (mc *MockConsumer) PartitionConsumerMetrics(topic string, partition int32) (gonzo.PartitionConsumerMetrics, error) {
 	return nil, nil
 }
 
