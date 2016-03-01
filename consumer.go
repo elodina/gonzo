@@ -100,7 +100,7 @@ type KafkaConsumer struct {
 func NewConsumer(client Client, config *ConsumerConfig, strategy Strategy) Consumer {
 	var metrics ConsumerMetrics = noOpConsumerMetrics
 	if config.EnableMetrics {
-		metrics = NewKafkaConsumerMetrics(config.Group)
+		metrics = NewKafkaConsumerMetrics(config.Group, config.ConsumerID)
 	}
 
 	return &KafkaConsumer{

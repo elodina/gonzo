@@ -18,7 +18,6 @@ package gonzo
 import (
 	"fmt"
 	"github.com/rcrowley/go-metrics"
-	"github.com/satori/go.uuid"
 )
 
 // Metrics is a set of all metrics for one Consumer instance.
@@ -51,8 +50,8 @@ type KafkaConsumerMetrics struct {
 }
 
 // NewKafkaConsumerMetrics creates new KafkaConsumerMetrics for a given consumer group.
-func NewKafkaConsumerMetrics(group string) *KafkaConsumerMetrics {
-	registry := metrics.NewPrefixedRegistry(fmt.Sprintf("%s.%s.", group, uuid.NewV4()))
+func NewKafkaConsumerMetrics(groupID string, consumerID string) *KafkaConsumerMetrics {
+	registry := metrics.NewPrefixedRegistry(fmt.Sprintf("%s.%s.", groupID, consumerID))
 
 	return &KafkaConsumerMetrics{
 		registry: registry,

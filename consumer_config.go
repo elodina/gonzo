@@ -17,6 +17,7 @@ package gonzo
 
 import (
 	"github.com/elodina/siesta"
+	"github.com/satori/go.uuid"
 	"time"
 )
 
@@ -24,6 +25,10 @@ import (
 type ConsumerConfig struct {
 	// Group is a string that uniquely identifies a set of consumers within the same consumer group.
 	Group string
+
+	// ConsumerID is a string that uniquely identifies a consumer within a consumer group.
+	// Defaults to a random UUID.
+	ConsumerID string
 
 	// KeyDecoder is a function that turns plain bytes into a decoded message key.
 	KeyDecoder Decoder
@@ -53,6 +58,7 @@ type ConsumerConfig struct {
 func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
 		Group:             "gonzo-group",
+		ConsumerID:        uuid.NewV4().String(),
 		KeyDecoder:        new(ByteDecoder),
 		ValueDecoder:      new(ByteDecoder),
 		AutoOffsetReset:   siesta.EarliestTime,
