@@ -16,6 +16,7 @@ limitations under the License. */
 package gonzo
 
 import (
+	log "github.com/golang/glog"
 	"github.com/rcrowley/go-metrics"
 	"sync"
 )
@@ -125,7 +126,7 @@ func (c *KafkaConsumer) Add(topic string, partition int32) error {
 	}
 
 	if _, exists := c.partitionConsumers[topic][partition]; exists {
-		Logger.Info("Partition consumer for topic %s, partition %d already exists", topic, partition)
+		log.Info("Partition consumer for topic %s, partition %d already exists", topic, partition)
 		return ErrPartitionConsumerAlreadyExists
 	}
 
@@ -147,7 +148,7 @@ func (c *KafkaConsumer) Remove(topic string, partition int32) error {
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
-		Logger.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return ErrPartitionConsumerDoesNotExist
 	}
 
@@ -185,7 +186,7 @@ func (c *KafkaConsumer) Offset(topic string, partition int32) (int64, error) {
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
-		Logger.Info("Can't get offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Can't get offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return -1, ErrPartitionConsumerDoesNotExist
 	}
 
@@ -206,7 +207,7 @@ func (c *KafkaConsumer) SetOffset(topic string, partition int32, offset int64) e
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
-		Logger.Info("Can't set offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Can't set offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return ErrPartitionConsumerDoesNotExist
 	}
 
@@ -223,7 +224,7 @@ func (c *KafkaConsumer) Lag(topic string, partition int32) (int64, error) {
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
-		Logger.Info("Can't get lag as partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Can't get lag as partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return -1, ErrPartitionConsumerDoesNotExist
 	}
 
@@ -271,7 +272,7 @@ func (c *KafkaConsumer) PartitionConsumerMetrics(topic string, partition int32) 
 	defer c.partitionConsumersLock.Unlock()
 
 	if !c.exists(topic, partition) {
-		Logger.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return nil, ErrPartitionConsumerDoesNotExist
 	}
 

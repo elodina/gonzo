@@ -17,6 +17,7 @@ package gonzo
 
 import (
 	"github.com/elodina/siesta"
+	log "github.com/golang/glog"
 	"github.com/rcrowley/go-metrics"
 	"sync/atomic"
 	"time"
@@ -87,7 +88,7 @@ func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, p
 // Start starts consuming a single partition from Kafka.
 // This call blocks until Stop() is called.
 func (pc *KafkaPartitionConsumer) Start() {
-	Logger.Info("Starting partition consumer for topic %s, partition %d", pc.topic, pc.partition)
+	log.Info("Starting partition consumer for topic %s, partition %d", pc.topic, pc.partition)
 	proceed := pc.initOffset()
 	if !proceed {
 		return
@@ -97,7 +98,7 @@ func (pc *KafkaPartitionConsumer) Start() {
 		select {
 		case <-pc.stop:
 			{
-				Logger.Info("Stopping fetcher loop for topic %s, partition %d", pc.topic, pc.partition)
+				log.Info("Stopping fetcher loop for topic %s, partition %d", pc.topic, pc.partition)
 				return
 			}
 		default:
@@ -115,7 +116,7 @@ func (pc *KafkaPartitionConsumer) Start() {
 				})
 
 				if err != nil {
-					Logger.Warn("Fetch error: %s", err)
+					log.Warning("Fetch error: %s", err)
 					pc.metrics.NumFailedFetches(func(numFailedFetches metrics.Counter) {
 						numFailedFetches.Inc(1)
 					})
@@ -169,7 +170,7 @@ func (pc *KafkaPartitionConsumer) Start() {
 					offset := messages[len(messages)-1].Offset
 					err = pc.Commit(offset)
 					if err != nil {
-						Logger.Warn("Could not commit offset %d for topic %s, partition %d", offset, pc.topic, pc.partition)
+						log.Warning("Could not commit offset %d for topic %s, partition %d", offset, pc.topic, pc.partition)
 					}
 				}
 			}
@@ -180,7 +181,7 @@ func (pc *KafkaPartitionConsumer) Start() {
 // Stop stops consuming partition from Kafka.
 // This means the PartitionConsumer will stop accepting new batches but will have a chance to finish its current work.
 func (pc *KafkaPartitionConsumer) Stop() {
-	Logger.Info("Stopping partition consumer for topic %s, partition %d", pc.topic, pc.partition)
+	log.Info("Stopping partition consumer for topic %s, partition %d", pc.topic, pc.partition)
 	pc.stop <- struct{}{}
 	pc.metrics.Stop()
 }
@@ -233,11 +234,11 @@ func (pc *KafkaPartitionConsumer) initOffset() bool {
 			if err == siesta.ErrUnknownTopicOrPartition {
 				return pc.resetOffset()
 			}
-			Logger.Warn("Cannot get offset for group %s, topic %s, partition %d: %s\n", pc.config.Group, pc.topic, pc.partition, err)
+			log.Warning("Cannot get offset for group %s, topic %s, partition %d: %s\n", pc.config.Group, pc.topic, pc.partition, err)
 			select {
 			case <-pc.stop:
 				{
-					Logger.Warn("PartitionConsumer told to stop trying to get offset, returning")
+					log.Warning("PartitionConsumer told to stop trying to get offset, returning")
 					return false
 				}
 			default:
@@ -255,11 +256,11 @@ func (pc *KafkaPartitionConsumer) resetOffset() bool {
 	for {
 		offset, err := pc.client.GetAvailableOffset(pc.topic, pc.partition, pc.config.AutoOffsetReset)
 		if err != nil {
-			Logger.Warn("Cannot get available offset for topic %s, partition %d: %s", pc.topic, pc.partition, err)
+			log.Warning("Cannot get available offset for topic %s, partition %d: %s", pc.topic, pc.partition, err)
 			select {
 			case <-pc.stop:
 				{
-					Logger.Warn("PartitionConsumer told to stop trying to get offset, returning")
+					log.Warning("PartitionConsumer told to stop trying to get offset, returning")
 					return false
 				}
 			default:
@@ -277,12 +278,12 @@ func (pc *KafkaPartitionConsumer) collectorFunc(messages *[]*MessageAndMetadata)
 	return func(topic string, partition int32, offset int64, key []byte, value []byte) error {
 		decodedKey, err := pc.config.KeyDecoder.Decode(key)
 		if err != nil {
-			Logger.Warn(err.Error())
+			log.Warning(err.Error())
 			return err
 		}
 		decodedValue, err := pc.config.ValueDecoder.Decode(value)
 		if err != nil {
-			Logger.Warn(err.Error())
+			log.Warning(err.Error())
 			return err
 		}
 

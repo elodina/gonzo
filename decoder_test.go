@@ -28,7 +28,6 @@ func TestDecoders(t *testing.T) {
 
 	assert.Equal(t, nil, err)
 	assert.Equal(t, bytes, decodedBytes)
-	//	assert(t, decodedBytes, bytes)
 
 	// empty bytes
 	bytes = nil
@@ -36,7 +35,6 @@ func TestDecoders(t *testing.T) {
 
 	assert.Equal(t, nil, err)
 	assert.Equal(t, bytes, decodedBytes)
-	//	assert(t, decodedBytes, bytes)
 
 	// normal string
 	str := "hello world"
@@ -45,7 +43,6 @@ func TestDecoders(t *testing.T) {
 
 	assert.Equal(t, nil, err)
 	assert.Equal(t, str, decodedString)
-	//	assert(t, decodedString, str)
 
 	// empty string
 	str = ""
@@ -53,5 +50,4 @@ func TestDecoders(t *testing.T) {
 
 	assert.Equal(t, nil, err)
 	assert.Equal(t, str, decodedString)
-	//	assert(t, decodedString, str)
 }

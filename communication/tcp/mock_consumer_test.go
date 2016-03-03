@@ -16,6 +16,7 @@ package tcp
 import (
 	"fmt"
 	"github.com/elodina/gonzo"
+	log "github.com/golang/glog"
 	"sync"
 )
 
@@ -46,7 +47,7 @@ func (mc *MockConsumer) Add(topic string, partition int32) error {
 	}
 
 	if _, exists := mc.partitionConsumers[topic][partition]; exists {
-		gonzo.Logger.Info("Partition consumer for topic %s, partition %d already exists", topic, partition)
+		log.Info("Partition consumer for topic %s, partition %d already exists", topic, partition)
 		return fmt.Errorf("Partition consumer for topic %s, partition %d already exists", topic, partition)
 	}
 
@@ -61,7 +62,7 @@ func (mc *MockConsumer) Remove(topic string, partition int32) error {
 	defer mc.partitionConsumersLock.Unlock()
 
 	if !mc.exists(topic, partition) {
-		gonzo.Logger.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 	}
 
@@ -89,7 +90,7 @@ func (mc *MockConsumer) Offset(topic string, partition int32) (int64, error) {
 	defer mc.partitionConsumersLock.Unlock()
 
 	if !mc.exists(topic, partition) {
-		gonzo.Logger.Info("Can't get offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Can't get offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return -1, fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 	}
 
@@ -110,7 +111,7 @@ func (mc *MockConsumer) SetOffset(topic string, partition int32, offset int64) e
 	defer mc.partitionConsumersLock.Unlock()
 
 	if !mc.exists(topic, partition) {
-		gonzo.Logger.Info("Can't set offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Can't set offset as partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 	}
 
@@ -124,7 +125,7 @@ func (mc *MockConsumer) Lag(topic string, partition int32) (int64, error) {
 	defer mc.partitionConsumersLock.Unlock()
 
 	if !mc.exists(topic, partition) {
-		gonzo.Logger.Info("Can't get lag as partition consumer for topic %s, partition %d does not exist", topic, partition)
+		log.Info("Can't get lag as partition consumer for topic %s, partition %d does not exist", topic, partition)
 		return -1, fmt.Errorf("Partition consumer for topic %s, partition %d does not exist", topic, partition)
 	}
 
