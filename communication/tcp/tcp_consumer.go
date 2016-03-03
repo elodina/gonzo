@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/elodina/gonzo"
+	log "github.com/golang/glog"
 	"net"
 )
 
@@ -54,7 +55,7 @@ func (tc *Consumer) RegisterCustomHandler(key string, handler func([]byte) (*Res
 // Start starts listening the given TCP address. Returns an error if anything went wrong while
 // listening TCP.
 func (tc *Consumer) Start() error {
-	gonzo.Logger.Info("Starting TCP consumer")
+	log.Info("Starting TCP consumer")
 	tcpAddr, err := net.ResolveTCPAddr("tcp", tc.address)
 	if err != nil {
 		return err
@@ -65,7 +66,7 @@ func (tc *Consumer) Start() error {
 		return err
 	}
 
-	gonzo.Logger.Info("Listening TCP at %s", tc.address)
+	log.Info("Listening TCP at %s", tc.address)
 	go tc.closeListener(listener)
 	go tc.listen(listener)
 
@@ -74,7 +75,7 @@ func (tc *Consumer) Start() error {
 
 // Stop stops both this TCP wrapper and the underlying consumer.
 func (tc *Consumer) Stop() {
-	gonzo.Logger.Info("Stopping TCP consumer")
+	log.Info("Stopping TCP consumer")
 	tc.close <- struct{}{}
 	tc.consumer.Stop()
 	<-tc.closed
@@ -92,14 +93,18 @@ func (tc *Consumer) Join() {
 
 func (tc *Consumer) listen(listener *net.TCPListener) {
 	for {
-		gonzo.Logger.Debug("Accepting client connection")
+		if log.V(2) {
+			log.Info("Accepting client connection")
+		}
 		connection, err := listener.Accept()
 		if err != nil {
-			gonzo.Logger.Warn("%s", err)
+			log.Warning("%s", err)
 			return
 		}
 
-		gonzo.Logger.Debug("Accepted client connection")
+		if log.V(2) {
+			log.Info("Accepted client connection")
+		}
 		go tc.handleConnection(connection)
 	}
 }
@@ -108,7 +113,7 @@ func (tc *Consumer) closeListener(listener *net.TCPListener) {
 	<-tc.close
 	err := listener.Close()
 	if err != nil {
-		gonzo.Logger.Warn("%s", err)
+		log.Warning("%s", err)
 	}
 	close(tc.closed)
 }
@@ -123,11 +128,11 @@ func (tc *Consumer) handleConnection(connection net.Conn) {
 
 		jsonResponse, err := json.Marshal(response)
 		if err != nil {
-			gonzo.Logger.Warn("Cannot marshal response to JSON: %s", err)
+			log.Warning("Cannot marshal response to JSON: %s", err)
 		} else {
 			_, err = connection.Write(append(jsonResponse, messageDelimiter))
 			if err != nil {
-				gonzo.Logger.Warn("Cannot write response to connection: %s", err)
+				log.Warning("Cannot write response to connection: %s", err)
 			}
 		}
 	}
@@ -161,7 +166,7 @@ func (tc *Consumer) handleRequest(req string) (*Response, error) {
 			if ok {
 				return handler([]byte(request.Data))
 			}
-			gonzo.Logger.Warn("Unknown request key %s", request.Key)
+			log.Warning("Unknown request key %s", request.Key)
 		}
 	}
 

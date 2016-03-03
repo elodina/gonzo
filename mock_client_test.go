@@ -18,6 +18,7 @@ package gonzo
 import (
 	"fmt"
 	"github.com/elodina/siesta"
+	log "github.com/golang/glog"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 )
@@ -54,10 +55,10 @@ func NewMockClient(startOffset int64, highwaterMarkOffset int64) *MockClient {
 }
 
 func (mc *MockClient) Fetch(topic string, partition int32, offset int64) (*siesta.FetchResponse, error) {
-	Logger.Debug("MockClient.Fetch(%s, %d, %d)", topic, partition, offset)
+	log.V(2).Infof("MockClient.Fetch(%s, %d, %d)", topic, partition, offset)
 	mc.offset = offset
 	if mc.fetchErrorTimes > 0 {
-		Logger.Debug("MockClient.Fetch() should return error %d more times", mc.fetchErrorTimes)
+		log.V(2).Infof("MockClient.Fetch() should return error %d more times", mc.fetchErrorTimes)
 		mc.fetchErrorTimes--
 		return nil, mc.fetchError
 	}
@@ -95,9 +96,9 @@ func (mc *MockClient) Fetch(topic string, partition int32, offset int64) (*siest
 }
 
 func (mc *MockClient) GetOffset(group string, topic string, partition int32) (int64, error) {
-	Logger.Debug("MockClient.GetOffset(%s, %s, %d)", group, topic, partition)
+	log.V(2).Infof("MockClient.GetOffset(%s, %s, %d)", group, topic, partition)
 	if mc.getOffsetErrorTimes > 0 {
-		Logger.Debug("MockClient.GetOffset() should return error %d more times", mc.getOffsetErrorTimes)
+		log.V(2).Infof("MockClient.GetOffset() should return error %d more times", mc.getOffsetErrorTimes)
 		mc.getOffsetErrorTimes--
 		return -1, mc.getOffsetError
 	}
@@ -114,9 +115,9 @@ func (mc *MockClient) CommitOffset(group string, topic string, partition int32, 
 }
 
 func (mc *MockClient) GetAvailableOffset(topic string, partition int32, offsetTime int64) (int64, error) {
-	Logger.Debug("MockClient.GetAvailableOffset(%s, %d, %d)", topic, partition, offsetTime)
+	log.V(2).Infof("MockClient.GetAvailableOffset(%s, %d, %d)", topic, partition, offsetTime)
 	if mc.getAvailableOffsetErrorTimes > 0 {
-		Logger.Debug("MockClient.GetAvailableOffset() should return error %d more times", mc.getAvailableOffsetErrorTimes)
+		log.V(2).Infof("MockClient.GetAvailableOffset() should return error %d more times", mc.getAvailableOffsetErrorTimes)
 		mc.getAvailableOffsetErrorTimes--
 		return -1, mc.getAvailableOffsetError
 	}

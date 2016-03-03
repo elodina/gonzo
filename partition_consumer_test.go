@@ -18,6 +18,7 @@ package gonzo
 import (
 	"fmt"
 	"github.com/elodina/siesta"
+	log "github.com/golang/glog"
 	"gopkg.in/stretchr/testify.v1/assert"
 	"testing"
 	"time"
@@ -33,35 +34,35 @@ func NewMockPartitionConsumer(client Client, config *ConsumerConfig, topic strin
 }
 
 func (mpc *MockPartitionConsumer) Start() {
-	Logger.Info("MockPartitionConsumer.Start()")
+	log.V(2).Infof("MockPartitionConsumer.Start()")
 }
 
 func (mpc *MockPartitionConsumer) Stop() {
-	Logger.Info("MockPartitionConsumer.Stop()")
+	log.V(2).Infof("MockPartitionConsumer.Stop()")
 }
 
 func (mpc *MockPartitionConsumer) Offset() int64 {
-	Logger.Info("MockPartitionConsumer.Offset()")
+	log.V(2).Infof("MockPartitionConsumer.Offset()")
 	return mpc.offset
 }
 
 func (mpc *MockPartitionConsumer) Commit(offset int64) error {
-	Logger.Info("MockPartitionConsumer.Commit()")
+	log.V(2).Infof("MockPartitionConsumer.Commit()")
 	return nil
 }
 
 func (mpc *MockPartitionConsumer) SetOffset(offset int64) {
-	Logger.Info("MockPartitionConsumer.SetOffset()")
+	log.V(2).Infof("MockPartitionConsumer.SetOffset()")
 	mpc.offset = offset
 }
 
 func (mpc *MockPartitionConsumer) Lag() int64 {
-	Logger.Info("MockPartitionConsumer.Lag()")
+	log.V(2).Infof("MockPartitionConsumer.Lag()")
 	return mpc.lag
 }
 
 func (mpc *MockPartitionConsumer) Metrics() (PartitionConsumerMetrics, error) {
-	Logger.Info("MockPartitionConsumer.Metrics()")
+	log.V(2).Infof("MockPartitionConsumer.Metrics()")
 	return nil, nil
 }
 
