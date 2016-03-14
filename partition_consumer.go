@@ -105,11 +105,15 @@ func (pc *KafkaPartitionConsumer) Start() {
 			{
 				var response *siesta.FetchResponse
 				var err error
-				pc.metrics.FetchDuration(func(fetchDuration metrics.Timer) {
-					fetchDuration.Time(func() {
-						response, err = pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
+				if pc.config.EnableMetrics {
+					pc.metrics.FetchDuration(func(fetchDuration metrics.Timer) {
+						fetchDuration.Time(func() {
+							response, err = pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
+						})
 					})
-				})
+				} else {
+					response, err = pc.client.Fetch(pc.topic, pc.partition, atomic.LoadInt64(&pc.offset))
+				}
 
 				pc.metrics.NumFetches(func(numFetches metrics.Counter) {
 					numFetches.Inc(1)
