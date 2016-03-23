@@ -88,7 +88,7 @@ func NewPartitionConsumer(client Client, config *ConsumerConfig, topic string, p
 // Start starts consuming a single partition from Kafka.
 // This call blocks until Stop() is called.
 func (pc *KafkaPartitionConsumer) Start() {
-	log.Info("Starting partition consumer for topic %s, partition %d", pc.topic, pc.partition)
+	log.Infof("Starting partition consumer for topic %s, partition %d", pc.topic, pc.partition)
 	proceed := pc.initOffset()
 	if !proceed {
 		return
@@ -232,6 +232,7 @@ func (pc *KafkaPartitionConsumer) Metrics() (PartitionConsumerMetrics, error) {
 }
 
 func (pc *KafkaPartitionConsumer) initOffset() bool {
+	log.Infof("Initializing offset for topic %s, partition %d", pc.topic, pc.partition)
 	for {
 		offset, err := pc.client.GetOffset(pc.config.Group, pc.topic, pc.partition)
 		if err != nil {
@@ -248,6 +249,7 @@ func (pc *KafkaPartitionConsumer) initOffset() bool {
 			default:
 			}
 		} else {
+			log.Infof("Initialized offset to %d", offset)
 			atomic.StoreInt64(&pc.offset, offset)
 			atomic.StoreInt64(&pc.highwaterMarkOffset, offset)
 			return true
@@ -257,6 +259,7 @@ func (pc *KafkaPartitionConsumer) initOffset() bool {
 }
 
 func (pc *KafkaPartitionConsumer) resetOffset() bool {
+	log.Infof("Resetting offset for topic %s, partition %d", pc.topic, pc.partition)
 	for {
 		offset, err := pc.client.GetAvailableOffset(pc.topic, pc.partition, pc.config.AutoOffsetReset)
 		if err != nil {
@@ -270,6 +273,7 @@ func (pc *KafkaPartitionConsumer) resetOffset() bool {
 			default:
 			}
 		} else {
+			log.Infof("Offset reset to %d", offset)
 			atomic.StoreInt64(&pc.offset, offset)
 			atomic.StoreInt64(&pc.highwaterMarkOffset, offset)
 			return true
