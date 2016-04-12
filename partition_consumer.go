@@ -249,9 +249,10 @@ func (pc *KafkaPartitionConsumer) initOffset() bool {
 			default:
 			}
 		} else {
-			log.Infof("Initialized offset to %d", offset)
-			atomic.StoreInt64(&pc.offset, offset)
-			atomic.StoreInt64(&pc.highwaterMarkOffset, offset)
+			validOffset := offset + 1
+			log.Infof("Initialized offset to %d", validOffset)
+			atomic.StoreInt64(&pc.offset, validOffset)
+			atomic.StoreInt64(&pc.highwaterMarkOffset, validOffset)
 			return true
 		}
 		time.Sleep(pc.config.InitOffsetBackoff)

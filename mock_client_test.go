@@ -102,7 +102,7 @@ func (mc *MockClient) GetOffset(group string, topic string, partition int32) (in
 		mc.getOffsetErrorTimes--
 		return -1, mc.getOffsetError
 	}
-	return mc.offset, nil
+	return mc.offset - 1, nil
 }
 
 func (mc *MockClient) CommitOffset(group string, topic string, partition int32, offset int64) error {
