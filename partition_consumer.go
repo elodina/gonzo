@@ -165,10 +165,21 @@ func (pc *KafkaPartitionConsumer) Start() {
 					numFetchedMessages.Inc(int64(len(data.Messages)))
 				})
 
-				pc.strategy(&FetchData{
-					Messages: messages,
-					Error:    err,
-				}, pc)
+				if pc.config.EnableMetrics {
+					pc.metrics.BatchDuration(func(batchDuration metrics.Timer) {
+						batchDuration.Time(func() {
+							pc.strategy(&FetchData{
+								Messages: messages,
+								Error:    err,
+							}, pc)
+						})
+					})
+				} else {
+					pc.strategy(&FetchData{
+						Messages: messages,
+						Error:    err,
+					}, pc)
+				}
 
 				if pc.config.AutoCommitEnable && len(messages) > 0 {
 					offset := messages[len(messages)-1].Offset
